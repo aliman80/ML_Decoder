@@ -13,7 +13,7 @@ from inplace_abn import InPlaceABN, ABN
 def InplacABN_to_ABN(module: nn.Module) -> nn.Module:
     # convert all InplaceABN layer to bit-accurate ABN layers.
     if isinstance(module, InPlaceABN):
-        module_new = ABN(module.num_features, activation=module.activation,
+        module_new = ABN(module.num_features, activation=module.activation, # activation batch normalizatio layer
                          activation_param=module.activation_param)
         for key in module.state_dict():
             module_new.state_dict()[key].copy_(module.state_dict()[key])
@@ -200,11 +200,11 @@ class TResNet(Module):
             block(self.inplanes, planes, use_se=use_se, anti_alias_layer=anti_alias_layer))
         return nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, text_features):
         x = self.body(x)
         self.embeddings = self.global_pool(x)
-        logits = self.head(self.embeddings)
-        return logits
+        logits, image_embeddings = self.head(self.embeddings)
+        return logits, image_embeddings
 
 
 def TResnetS(model_params):

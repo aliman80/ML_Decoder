@@ -14,6 +14,8 @@ import json
 import torch.utils.data as data
 from sklearn.preprocessing import MultiLabelBinarizer
 import pandas as pd
+from sklearn.metrics import average_precision_score, f1_score, precision_score, recall_score
+import clip
 
 
 
@@ -41,7 +43,15 @@ def average_precision(output, target):
     precision_at_i = precision_at_i_ / (total + epsilon)
 
     return precision_at_i
-
+#######ADDING RECALL#############
+def recall(predictions, labels, k_val):
+    idx = predictions.topk(dim=1, k=k_val)[1] 
+    predictions.scatter_(dim=1,index=idx,src=torch.ones(predictions.size(0),k_val))
+    mask = predictions == 1
+    TP = (labels[mask] == 1).sum().float()
+    tpfn = (labels == 1).sum().float()
+    recall = TP/tpfn
+    return 100 * recall
 
 def mAP(targs, preds):
     """Returns the model's average precision for each class
@@ -60,6 +70,38 @@ def mAP(targs, preds):
         # compute average precision
         ap[k] = average_precision(scores, targets)
     return 100 * ap.mean()
+
+
+def f1(predictions, labels, mode_F1, k_val):
+        ## cuda F1 computation
+        idx = predictions.topk(dim=1, k=k_val)[1] 
+        #tmux predictions.fill_(0)
+        predictions.scatter_(dim=1,index=idx,src=torch.ones(predictions.size(0),k_val))
+        if mode_F1 == 'overall':
+            # print('evaluation overall!! cannot decompose into classes F1 score')
+            mask = predictions == 1
+            TP = (labels[mask] == 1).sum().float()
+            tpfp = mask.sum().float()
+            tpfn = (labels == 1).sum().float()
+            p = TP/ tpfp
+            r = TP/tpfn
+            f1 = 2*p*r/(p+r+(1e-8))
+        else:
+            num_class = predictions.shape[1]
+            # print('evaluation per classes')
+            f1 = np.zeros(num_class)
+            p = np.zeros(num_class)
+            r = np.zeros(num_class)
+            for idx_cls in range(num_class):
+                prediction = np.squeeze(predictions[:, idx_cls])
+                label = np.squeeze(labels[:, idx_cls])
+                if np.sum(label > 0) == 0:
+                    continue
+                binary_label = np.clip(label, 0, 1)
+                f1[idx_cls] = f1_score(binary_label, prediction)
+                p[idx_cls] = precision_score(binary_label, prediction)
+                r[idx_cls] = recall_score(binary_label, prediction)
+        return f1 * 100, p * 100, r * 100
 
 
 class AverageMeter(object):
@@ -251,12 +293,11 @@ def default_loader(path):
 class DatasetFromList(data.Dataset):
     """From List dataset."""
 
-    def __init__(self, root, impaths, labels, idx_to_class,
+    def __init__(self, root, impaths, labels, sentences, add_clip_loss, idx_to_class,
                  transform=None, target_transform=None, class_ids=None,
                  loader=default_loader):
         """
         Args:
-
             root_dir (string): Directory with all the images.
             transform (callable, optional): Optional transform to be applied
                 on a sample.
@@ -268,19 +309,28 @@ class DatasetFromList(data.Dataset):
         self.loader = loader
         self.samples = tuple(zip(impaths, labels))
         self.class_ids = class_ids
-        self.get_relevant_samples()
+        self.add_clip_loss = add_clip_loss
+        if add_clip_loss:
+            self.sentences = sentences
+            self.clip_tokens = torch.cat([clip.tokenize(sentence) for sentence in sentences])
+
 
     def __getitem__(self, index):
+        data_dict = {}
         impath, target = self.samples[index]
         img = self.loader(os.path.join(self.root, impath))
         if self.transform is not None:
             img = self.transform(img)
+        data_dict['image'] = img
         if self.target_transform is not None:
             target = self.target_transform([target])
         target = self.get_targets_multi_label(np.array(target))
         if self.class_ids is not None:
             target = target[self.class_ids]
-        return img, target
+        data_dict['target'] = target
+        if self.add_clip_loss:
+            data_dict['clip_tokens'] = self.clip_tokens[index]
+        return data_dict
 
     def __len__(self):
         return len(self.samples)
@@ -291,18 +341,6 @@ class DatasetFromList(data.Dataset):
         labels[target] = 1
         target = labels.astype('float32')
         return target
-
-    def get_relevant_samples(self):
-        new_samples = [s for s in
-                       self.samples if any(x in self.class_ids for x in s[1])]
-        # new_indices = [i for i, s in enumerate(self.samples) if any(x in self.class_ids for x
-        #                                                             in s[1])]
-        # omitted_samples = [s for s in
-        #                    self.samples if not any(x in self.class_ids for x in s[1])]
-
-        self.samples = new_samples
-
-
 
 def parse_csv_data(dataset_local_path, metadata_local_path):
     try:
@@ -327,7 +365,19 @@ def parse_csv_data(dataset_local_path, metadata_local_path):
     # logger.info("em: end parsr_csv_data: num_labeles: %d " % len(image_labels_list))
     # logger.info("em: end parsr_csv_data: : %d " % len(image_labels_list))
 
-    return images_path_list, image_labels_list, train_idx, valid_idx
+    image_sentences_list = []
+    for img_list in image_labels_list:
+        sen = 'a photo of '
+        for i in range(len(img_list)):
+            if len(sen + img_list[i]) < 77:
+                if i == len(img_list) - 2:
+                    sen += img_list[i] + ' and '
+                elif i == len(img_list) - 1:
+                    sen += img_list[i]
+                else:
+                    sen += img_list[i] + ', '
+        image_sentences_list.append(sen)
+    return images_path_list, image_labels_list, image_sentences_list, train_idx, valid_idx
 
 
 def multilabel2numeric(multilabels):
@@ -343,25 +393,31 @@ def multilabel2numeric(multilabels):
     return multilabels_numeric, class_to_idx, idx_to_class
 
 
-def get_datasets_from_csv(dataset_local_path, metadata_local_path, train_transform,
+def get_datasets_from_csv(args, dataset_local_path, metadata_local_path, train_transform,
                           val_transform, json_path):
 
-    images_path_list, image_labels_list, train_idx, valid_idx = parse_csv_data(dataset_local_path, metadata_local_path)
+    images_path_list, image_labels_list, image_sentences_list, train_idx, valid_idx = parse_csv_data(dataset_local_path, metadata_local_path)
     labels, class_to_idx, idx_to_class = multilabel2numeric(image_labels_list)
 
     images_path_list_train = [images_path_list[idx] for idx in train_idx]
     image_labels_list_train = [labels[idx] for idx in train_idx]
+    image_sentences_list_train = [image_sentences_list[idx] for idx in train_idx]
 
     images_path_list_val = [images_path_list[idx] for idx in valid_idx]
     image_labels_list_val = [labels[idx] for idx in valid_idx]
+    image_sentences_list_val = [image_sentences_list[idx] for idx in valid_idx]
 
     train_cls_ids, _, test_cls_ids = get_class_ids_split(json_path, idx_to_class)
 
-    train_dl = DatasetFromList(dataset_local_path, images_path_list_train, image_labels_list_train,
-                               idx_to_class,
+    if args.gzsl:
+        test_cls_ids = np.concatenate((train_cls_ids,test_cls_ids))
+    
+    train_dl = DatasetFromList(dataset_local_path, images_path_list_train, image_labels_list_train, image_sentences_list_train, args.add_clip_loss,
+                               idx_to_class, 
                                transform=train_transform, class_ids=train_cls_ids)
 
-    val_dl = DatasetFromList(dataset_local_path, images_path_list_val, image_labels_list_val, idx_to_class,
-                             transform=val_transform, class_ids=test_cls_ids)
+    val_dl = DatasetFromList(dataset_local_path, images_path_list_val, image_labels_list_val, image_sentences_list_val, args.add_clip_loss, 
+                              idx_to_class, 
+                              transform=val_transform, class_ids=test_cls_ids)
 
     return train_dl, val_dl, train_cls_ids, test_cls_ids

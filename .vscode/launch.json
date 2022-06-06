@@ -1,0 +1,71 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "clip",
+            "type": "python",
+            "request": "launch",
+            "program": "eval_clip.py",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+        },
+        {
+            "name": "train",
+            "type": "python",
+            "request": "launch",
+            "program": "train.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--use-clip-encoder", "1"
+            ]
+        },
+             {
+                   "name": "infer.py",
+                     "type": "python",
+                     "request": "launch",
+                     "program": "/home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/infer.py",
+                     "console": "integratedTerminal",
+                     "args": [
+                         "--num-classes", "100",
+                         "--model-name",
+                         "tresnet_l",
+                         "--image-size",
+                         "224",
+                         "--th","0.75",
+                         "--model-path","/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_l.pth"
+                     ]
+            },
+            
+        {
+            "name": "train_zsl_nus",
+            "type": "python",
+            "request": "launch",
+            "program": "train_zsl_nus.py",
+            "console": "integratedTerminal",
+            "args": [
+                 "--model-name", "tresnet_m",
+                //  "--resume_training", "1",
+                //  "--model-path", "models/model-highest.ckpt",
+                "--model-path","/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_m21k.pth",
+                "--text-embeddings", "clip",
+                //  "--gzsl", "1",
+                "--workers", "3", 
+                // "--validate_only", "1",
+                "--exp_name", "train_textencodethr0.7",
+                "--thr", "0.7",
+                "--add-clip-loss", "1",
+                "--batch-size", "16",
+            ]
+        }
+    ]
+}

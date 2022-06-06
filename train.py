@@ -15,10 +15,10 @@ from randaugment import RandAugment
 from torch.cuda.amp import GradScaler, autocast
 
 parser = argparse.ArgumentParser(description='PyTorch MS_COCO Training')
-parser.add_argument('--data', type=str, default='/home/MSCOCO_2014/')
+parser.add_argument('--data', type=str, default='/home/muhammad.ali/Desktop/Research/MLDECODER/coco')
 parser.add_argument('--lr', default=1e-4, type=float)
 parser.add_argument('--model-name', default='tresnet_l')
-parser.add_argument('--model-path', default='https://miil-public-eu.oss-eu-central-1.aliyuncs.com/model-zoo/ML_Decoder/tresnet_l_pretrain_ml_decoder.pth', type=str)
+parser.add_argument('--model-path', default='https://miil-public-eu.oss-eu-central-1.aliyuncs.com/model-zoo/ML_Decoder/tresnet_l.pth', type=str)
 parser.add_argument('--num-classes', default=80)
 parser.add_argument('-j', '--workers', default=8, type=int, metavar='N',
                     help='number of data loading workers')
@@ -32,6 +32,9 @@ parser.add_argument('--use-ml-decoder', default=1, type=int)
 parser.add_argument('--num-of-groups', default=-1, type=int)  # full-decoding
 parser.add_argument('--decoder-embedding', default=768, type=int)
 parser.add_argument('--zsl', default=0, type=int)
+
+# CLIP
+parser.add_argument('--use-clip-encoder',default= 1,type=int )
 
 def main():
     args = parser.parse_args()
@@ -49,7 +52,7 @@ def main():
     # COCO Data loading
     instances_path_val = os.path.join(args.data, 'annotations/instances_val2014.json')
     instances_path_train = os.path.join(args.data, 'annotations/instances_train2014.json')
-    #data_path_val = args.data
+     #data_path_val = args.data
     #data_path_train = args.data
     data_path_val = f'{args.data}/val2014'  # args.data
     data_path_train = f'{args.data}/train2014'  # args.data
@@ -83,6 +86,7 @@ def main():
 
     # Actuall Training
     train_multi_label_coco(model, train_loader, val_loader, args.lr)
+    
 
 
 def train_multi_label_coco(model, train_loader, val_loader, lr):
@@ -108,6 +112,7 @@ def train_multi_label_coco(model, train_loader, val_loader, lr):
             target = target.max(dim=1)[0]
             with autocast():  # mixed precision
                 output = model(inputData).float()  # sigmoid will be done in loss !
+            #import pdb; pdb.set_trace()
             loss = criterion(output, target)
             model.zero_grad()
 
@@ -160,6 +165,7 @@ def validate_multi(val_loader, model, ema_model):
         target = target.max(dim=1)[0]
         # compute output
         with torch.no_grad():
+        
             with autocast():
                 output_regular = Sig(model(input.cuda())).cpu()
                 output_ema = Sig(ema_model.module(input.cuda())).cpu()

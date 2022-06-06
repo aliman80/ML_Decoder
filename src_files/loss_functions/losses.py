@@ -24,7 +24,7 @@ class AsymmetricLoss(nn.Module):
         x_sigmoid = torch.sigmoid(x)
         xs_pos = x_sigmoid
         xs_neg = 1 - x_sigmoid
-
+        #import pdb; pdb.set_trace()
         # Asymmetric Clipping
         if self.clip is not None and self.clip > 0:
             xs_neg = (xs_neg + self.clip).clamp(max=1)
@@ -32,7 +32,7 @@ class AsymmetricLoss(nn.Module):
         # Basic CE calculation
         los_pos = y * torch.log(xs_pos.clamp(min=self.eps))
         los_neg = (1 - y) * torch.log(xs_neg.clamp(min=self.eps))
-        loss = los_pos + los_neg
+        loss = los_pos + los_neg   # Trying to add the weighted combination of loss
 
         # Asymmetric Focusing
         if self.gamma_neg > 0 or self.gamma_pos > 0:
@@ -149,3 +149,30 @@ class ASLSingleLabel(nn.Module):
             loss = loss.mean()
 
         return loss
+
+
+class CLIPLoss(nn.Module):
+    def __init__(self, temperature, img_latent_size, text_latent_size, proj_size, device):
+        super().__init__()
+        self.device = device
+        self.temperature = nn.Parameter(torch.tensor(temperature)).to(self.device)
+        self.W_i = nn.Parameter(torch.randn(img_latent_size, proj_size)).to(self.device)
+        self.W_j = nn.Parameter(torch.randn(text_latent_size, proj_size)).to(self.device)
+        self.ce = nn.CrossEntropyLoss(reduction='none')
+    
+    def forward(self, z_i, z_j):
+        z_i = z_i.to(self.device)
+        z_j = z_j.to(self.device)
+        z_i_proj = z_i.float() @ self.W_i
+        z_j_proj = z_j.float() @ self.W_j
+        z_i_proj_norm = z_i_proj / torch.norm(z_i_proj, dim=1).unsqueeze(1)
+        z_j_proj_norm = z_j_proj / torch.norm(z_j_proj, dim=1).unsqueeze(1)
+
+        logits = (z_i_proj_norm @ z_j_proj_norm.T.float()) * torch.exp(self.temperature)
+
+        labels = torch.arange(logits.shape[0]).long().to(self.device)
+        loss_i = self.ce(logits, labels)
+        loss_j = self.ce(logits.T, labels)
+        loss = (loss_i + loss_j) / 2.0
+
+        return loss.mean(), loss_i.mean(), loss_j.mean()

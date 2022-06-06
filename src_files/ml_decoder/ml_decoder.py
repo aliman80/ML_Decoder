@@ -5,7 +5,7 @@ from torch import nn, Tensor
 from torch.nn.modules.transformer import _get_activation_fn
 
 
-def add_ml_decoder_head(model, num_classes=-1, num_of_groups=-1, decoder_embedding=768, zsl=0):
+def add_ml_decoder_head(model, num_classes=-1, num_of_groups=-1, decoder_embedding=768, zsl=0, text_embedding='wordvec'):
     if num_classes == -1:
         num_classes = model.num_classes
     num_features = model.num_features
@@ -13,13 +13,13 @@ def add_ml_decoder_head(model, num_classes=-1, num_of_groups=-1, decoder_embeddi
         model.global_pool = nn.Identity()
         del model.fc
         model.fc = MLDecoder(num_classes=num_classes, initial_num_features=num_features, num_of_groups=num_of_groups,
-                             decoder_embedding=decoder_embedding, zsl=zsl)
+                             decoder_embedding=decoder_embedding, zsl=zsl, text_embedding=text_embedding)
     elif hasattr(model, 'head'):  # tresnet
         if hasattr(model, 'global_pool'):
             model.global_pool = nn.Identity()
         del model.head
         model.head = MLDecoder(num_classes=num_classes, initial_num_features=num_features, num_of_groups=num_of_groups,
-                               decoder_embedding=decoder_embedding, zsl=zsl)
+                               decoder_embedding=decoder_embedding, zsl=zsl, text_embedding=text_embedding)
     else:
         print("model is not suited for ml-decoder")
         exit(-1)
@@ -100,7 +100,7 @@ class GroupFC(object):
 
 class MLDecoder(nn.Module):
     def __init__(self, num_classes, num_of_groups=-1, decoder_embedding=768,
-                 initial_num_features=2048, zsl=0):
+                 initial_num_features=2048, zsl=0, text_embedding='wordvec'):
         super(MLDecoder, self).__init__()
         embed_len_decoder = 100 if num_of_groups < 0 else num_of_groups
         if embed_len_decoder > num_classes:
@@ -129,8 +129,10 @@ class MLDecoder(nn.Module):
         self.zsl = zsl
 
         if self.zsl:
-            if decoder_embedding != 300:
+            if text_embedding == 'wordvec' and decoder_embedding != 300:
                 self.wordvec_proj = nn.Linear(300, decoder_embedding)
+            elif text_embedding == 'clip' and decoder_embedding != 512:
+                self.wordvec_proj = nn.Linear(512, decoder_embedding)
             else:
                 self.wordvec_proj = nn.Identity()
             self.decoder.duplicate_pooling = torch.nn.Parameter(torch.Tensor(decoder_embedding, 1))
@@ -160,6 +162,7 @@ class MLDecoder(nn.Module):
         bs = embedding_spatial_786.shape[0]
         if self.zsl:
             query_embed = torch.nn.functional.relu(self.wordvec_proj(self.decoder.query_embed))
+            
         else:
             query_embed = self.decoder.query_embed.weight
         # tgt = query_embed.unsqueeze(1).repeat(1, bs, 1)
@@ -175,4 +178,5 @@ class MLDecoder(nn.Module):
             h_out = out_extrap.flatten(1)
         h_out += self.decoder.duplicate_pooling_bias
         logits = h_out
-        return logits
+        # return logits, embedding_spatial_786.reshape(bs, -1), query_embed.unsqueeze(0).expand(bs, -1, -1).reshape(bs, -1) 
+        return logits, embedding_spatial_786.mean(1)

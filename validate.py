@@ -14,9 +14,9 @@ from src_files.helper_functions.helper_functions import mAP, CocoDetection, Aver
 from src_files.models import create_model
 
 parser = argparse.ArgumentParser(description='PyTorch MS_COCO validation')
-parser.add_argument('--data', type=str, default='/home/MSCOCO_2014/')
+parser.add_argument('--data', type=str, default='/home/muhammad.ali/Desktop/Research/MLDECODER/coco/')
 parser.add_argument('--model-name', default='tresnet_l')
-parser.add_argument('--model-path', default='model_path', type=str)
+parser.add_argument('--model-path', default='/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_l.pth', type=str)
 parser.add_argument('--num-classes', default=80)
 parser.add_argument('--image-size', default=448, type=int,
                     metavar='N', help='input image size (default: 448)')
@@ -45,6 +45,7 @@ def main():
     state = torch.load(args.model_path, map_location='cpu')
     model.load_state_dict(state['model'], strict=True)
     model.eval()
+
     ########### eliminate BN for faster inference ###########
     model = model.cpu()
     model = InplacABN_to_ABN(model)
@@ -86,7 +87,7 @@ def validate_multi(val_loader, model, args):
     targets = []
     for i, (input, target) in enumerate(val_loader):
         target = target
-        target = target.max(dim=1)[0]
+        # target = target.max(dim=1)[0]
         # compute output
         with torch.no_grad():
             output = Sig(model(input.cuda().half())).cpu()
