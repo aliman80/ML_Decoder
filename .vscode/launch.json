@@ -64,8 +64,10 @@
                 "--exp_name", "train_textencodethr0.7",
                 "--thr", "0.7",
                 "--add-clip-loss", "1",
-                "--batch-size", "8",
+                "--batch-size", "1",
+
                 "--use_prompt_learner", "1",
+                "--prompt_learner_n_ctx", "1"
             ]
         }
     ]

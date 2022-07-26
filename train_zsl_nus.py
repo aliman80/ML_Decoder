@@ -147,7 +147,7 @@ def main():
         clip_criterion = CLIPLoss(args.clip_loss_temp, args.decoder_embedding, 1024, 512, device)
     
         if args.use_prompt_learner:
-            pl_clip = PLCLIP(args, classnames, clip_model)
+            pl_clip = PLCLIP(args, classnames, clip_model, device)
         
     tmul.set_sharing_strategy('file_system')
     # Actuall Training

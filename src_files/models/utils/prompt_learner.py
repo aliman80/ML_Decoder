@@ -32,8 +32,9 @@ class TextEncoder(nn.Module):
 
 
 class PromptLearner(nn.Module):
-    def __init__(self, cfg, classnames, clip_model):
+    def __init__(self, cfg, classnames, clip_model, device):
         super().__init__()
+        self.device = device
         n_cls = len(classnames)
         n_ctx = cfg.prompt_learner_n_ctx
         ctx_init = cfg.prompt_learner_ctx_init
@@ -67,13 +68,13 @@ class PromptLearner(nn.Module):
         print(f'Initial context: "{prompt_prefix}"')
         print(f"Number of context words (tokens): {n_ctx}")
 
-        self.ctx = nn.Parameter(ctx_vectors).cuda()  # to be optimized
+        self.ctx = nn.Parameter(ctx_vectors).to(self.device)  # to be optimized
 
         classnames = [name.replace("_", " ") for name in classnames]
         name_lens = [len(_tokenizer.encode(name)) for name in classnames]
         prompts = [prompt_prefix + " " + name + "." for name in classnames]
 
-        tokenized_prompts = torch.cat([clip.tokenize(p) for p in prompts]).cuda()
+        tokenized_prompts = torch.cat([clip.tokenize(p) for p in prompts]).to(self.device)
         with torch.no_grad():
             embedding = clip_model.token_embedding(tokenized_prompts).type(dtype)
 
@@ -156,9 +157,9 @@ class PromptLearner(nn.Module):
         return prompts
 
 class PLCLIP(nn.Module):
-        def __init__(self, cfg, classnames, clip_model):
+        def __init__(self, cfg, classnames, clip_model, device):
             super().__init__()
-            self.prompt_learner = PromptLearner(cfg, classnames, clip_model)
+            self.prompt_learner = PromptLearner(cfg, classnames, clip_model, device)
             self.tokenized_prompts = self.prompt_learner.tokenized_prompts
             self.text_encoder = TextEncoder(clip_model)
 
