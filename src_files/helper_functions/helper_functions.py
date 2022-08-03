@@ -1,3 +1,4 @@
+import itertools
 import os
 from copy import deepcopy
 import random
@@ -420,4 +421,5 @@ def get_datasets_from_csv(args, dataset_local_path, metadata_local_path, train_t
                               idx_to_class, 
                               transform=val_transform, class_ids=test_cls_ids)
 
-    return train_dl, val_dl, train_cls_ids, test_cls_ids
+    classnames = list(set(itertools.chain.from_iterable(image_labels_list)))
+    return train_dl, val_dl, train_cls_ids, test_cls_ids, classnames

@@ -8,7 +8,7 @@
             "name": "clip",
             "type": "python",
             "request": "launch",
-            "program": "eval_clip.py",
+            "program": "encode_text_clip.py",
             "console": "integratedTerminal",
             "justMyCode": false
         },
@@ -58,14 +58,18 @@
                 //  "--model-path", "models/model-highest.ckpt",
                 "--model-path","/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_m21k.pth",
                 "--text-embeddings", "clip",
-                //  "--gzsl", "1",
+                  "--gzsl", "0",
                 "--workers", "3", 
                 "--validate_only", "1",
                 "--exp_name", "train_textencodethr0.7",
                 "--thr", "0.7",
                 "--add-clip-loss", "1",
                 "--batch-size", "16",
-                "--best_metric", "average"
+                "--best_metric", "average",
+                "--batch-size", "1",
+
+                "--use_prompt_learner", "1",
+                "--prompt_learner_n_ctx", "1"
             ]
         }
     ]

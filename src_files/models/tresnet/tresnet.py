@@ -204,7 +204,7 @@ class TResNet(Module):
         x = self.body(x)
         self.embeddings = self.global_pool(x)
         logits, image_embeddings = self.head(self.embeddings)
-        return logits, image_embeddings
+        return logits, image_embeddings # i added this term 
 
 
 def TResnetS(model_params):

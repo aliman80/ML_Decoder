@@ -1,6 +1,7 @@
 # import json
 import os
 import argparse
+from matplotlib.pyplot import text
 # from subprocess import call
 
 import torch
@@ -26,6 +27,8 @@ from src_files.helper_functions.helper_functions import mAP, CocoDetection, Aver
 import time
 import clip
 
+from src_files.models.utils.prompt_learner import PromptLearner, TextEncoder, PLCLIP
+
 
 parser = argparse.ArgumentParser(description='PyTorch MS_COCO Training')
 parser.add_argument('--data', type=str, default='/home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/')
@@ -37,7 +40,7 @@ parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers')
 parser.add_argument('--image_size', default=224, type=int,
                     metavar='N', help='input image size (default: 224)')
-parser.add_argument('--batch-size', default=56, type=int,
+parser.add_argument('--batch-size', default=28, type=int,
                     metavar='N', help='mini-batch size')
 parser.add_argument('--thr', default=0.75, type=float,
                     metavar='N', help='threshold value')
@@ -65,6 +68,12 @@ parser.add_argument('--best_metric', default='mAP', type=str, help='options=["mA
 
 parser.add_argument('--add-clip-head', default=0, type=int)
 
+parser.add_argument('--use_prompt_learner', default=0, type=int)
+parser.add_argument('--prompt_learner_n_ctx', default=16, type=int, help='number of context vectors')
+parser.add_argument('--prompt_learner_ctx_init', default="", type=str, help='initialization words')
+parser.add_argument('--prompt_learner_csc', default=0, type=int, help='if set to True, class-specific context is used')
+parser.add_argument('--prompt_learner_prec', default="fp16", type=str, help='options=["fp16","fp32", "amp"]')
+parser.add_argument('--prompt_learner_class_token_position', default="end", type=str, help='options=["middle","end", "front]')
 
 def main():
     args = parser.parse_args()
@@ -87,12 +96,6 @@ def main():
     json_path = os.path.join(args.data, 'benchmark_81_v0.json')
     wordvec_array = torch.load(os.path.join(args.data, args.text_embeddings+ '_array.pth'))
 
-    clip_model = None
-    clip_criterion = None
-    if args.add_clip_loss:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        clip_model, _ = clip.load('RN50', device)
-        clip_criterion = CLIPLoss(args.clip_loss_temp, args.decoder_embedding, 1024, 512, device)
 
     train_transform = transforms.Compose([
                                       transforms.Resize((args.image_size, args.image_size)),
@@ -106,7 +109,7 @@ def main():
                                     transforms.ToTensor(),
                                     # normalize, # no need, toTensor does normalization
                                 ])
-    train_dataset, val_dataset, train_cls_ids, test_cls_ids = get_datasets_from_csv(args, args.data,
+    train_dataset, val_dataset, train_cls_ids, test_cls_ids, classnames = get_datasets_from_csv(args, args.data,
                               args.data,
                               train_transform, val_transform,
                               json_path)
@@ -136,13 +139,23 @@ def main():
         val_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=False)
 
+    clip_model = None
+    clip_criterion = None
+    pl_clip = None
+    if args.add_clip_loss:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        clip_model, _ = clip.load('RN50', device)
+        clip_criterion = CLIPLoss(args.clip_loss_temp, args.decoder_embedding, 1024, 512, device)
     
+        if args.use_prompt_learner:
+            pl_clip = PLCLIP(args, classnames, clip_model, device)
+        
     tmul.set_sharing_strategy('file_system')
     # Actuall Training
-    train_multi_label_zsl(args, model, clip_model, clip_criterion, train_loader, val_loader, args.lr, train_wordvecs, test_wordvecs)
+    train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, train_loader, val_loader, args.lr, train_wordvecs, test_wordvecs)
 
 
-def train_multi_label_zsl(args, model, clip_model, clip_criterion, train_loader, val_loader, lr, train_wordvecs=None,
+def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, train_loader, val_loader, lr, train_wordvecs=None,
                           test_wordvecs=None):
     ema = ModelEma(model, 0.9997)  # 0.9997^641=0.82
 
@@ -162,9 +175,12 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, train_loader,
     highest_mAP = 0
     trainInfoList = []
     scaler = GradScaler()
+    
+   
     for epoch in range(Epochs):
         if not args.validate_only:
             update_wordvecs(model, train_wordvecs)
+            
             for i, input in enumerate(train_loader):
                 inputData = input['image'].cuda()
                 target = input['target'].cuda()  # (batch,3,num_classes)
@@ -216,8 +232,10 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, train_loader,
         update_wordvecs(ema.module, test_wordvecs=test_wordvecs)
        
 
-        mAP_score, f1_3, p_3, r_3, f1_5, p_5, r_5 = validate_multi(args, val_loader, model, ema)
+        mAP_score, f1_3, p_3, r_3, f1_5, p_5, r_5, clip_losses = validate_multi(args, val_loader, model, ema, clip_model, clip_criterion)
         model.train()
+        if args.add_clip_loss:
+            print('current_clip_loss = {:.2f}\n'.format(torch.mean(torch.Tensor(clip_losses))))
 
         if args.best_metric == 'mAP':
             if mAP_score > highest_mAP: 
@@ -287,9 +305,11 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, train_loader,
             "p_5_at_highest_average": p_5_at_highest_average,
             "r_5_at_highest_average": r_5_at_highest_average
         })
+    if args.add_clip_loss:
+        logs["val_clip_loss"] = torch.mean(torch.Tensor(clip_losses))
+    wandb.log(logs)
 
-
-def validate_multi(args, val_loader, model, ema_model):
+def validate_multi(args, val_loader, model, ema_model, clip_model, clip_criterion):
     print("starting validation")
     batch_time = AverageMeter()
     prec = AverageMeter()
@@ -302,14 +322,24 @@ def validate_multi(args, val_loader, model, ema_model):
     preds_regular = []
     preds_ema = []
     targets = []
+    clip_losses = []
     for i, data_dict in enumerate(val_loader):
         input = data_dict['image']
         target = data_dict['target']
         # compute output
         with torch.no_grad():
             with autocast():
-                output_regular = Sig(model(input.cuda())).cpu()
-                output_ema = Sig(ema_model.module(input.cuda())).cpu()
+                if args.add_clip_loss:
+                    clip_tokens = data_dict['clip_tokens'].cuda()
+                    text_features = clip_model.encode_text(clip_tokens)
+                output_regular, image_embeddings = model(input.cuda(), text_features)
+                if args.add_clip_loss:
+                    clip_loss, _, _ = clip_criterion(image_embeddings, text_features)
+                    clip_losses.append(clip_loss.item())
+                output_regular = Sig(output_regular).cpu()
+                output_ema, _ = ema_model.module(input.cuda(), text_features)
+                output_ema = Sig(output_ema).cpu()
+                # output_ema = Sig(ema_model.module(input.cuda())).cpu()
 
         # for mAP calculation
         preds_regular.append(output_regular.cpu().detach())
@@ -369,6 +399,8 @@ def validate_multi(args, val_loader, model, ema_model):
             print(
                 'P_C {:.2f} R_C {:.2f} F_C {:.2f} P_O {:.2f} R_O {:.2f} F_O {:.2f}'
                     .format(mean_p_c, mean_r_c, mean_f_c, p_o, r_o, f_o))
+            if args.add_clip_loss:
+                print("Clip loss: {:.4f}".format(torch.mean(torch.Tensor(clip_losses))))
 
     print(
         '--------------------------------------------------------------------')
@@ -386,7 +418,7 @@ def validate_multi(args, val_loader, model, ema_model):
     
      
     print("fi score k=3: {:.2f}. f1 score k=5: {:.2f}".format(f1_3, f1_5))
-    return max(mAP_score_regular, mAP_score_ema), f1_3, p_3, r_3, f1_5, p_5, r_5
+    return max(mAP_score_regular, mAP_score_ema), f1_3, p_3, r_3, f1_5, p_5, r_5, clip_losses
 
 
 if __name__ == '__main__':
