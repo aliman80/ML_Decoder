@@ -1,0 +1,29 @@
+program: train_zsl_nus.py
+method: grid
+parameters:
+  model-name: 
+    value: tresnet_m
+  model-path:
+    value: /home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_m21k.pth
+  text-embeddings:
+    value: clip
+  workers:
+    value: 3
+  exp_name:
+    value: tune
+  add-clip-loss:
+    value: 1
+  batch-size:
+    value: 16
+  clip-loss-weight:
+    values:
+      - 0.5
+      - 0.1
+  clip-loss-temp:
+    values:
+      - 0.3
+      - 0.6
+  best_metric:
+    values: 
+      - mAP
+      # - average

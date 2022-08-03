@@ -53,7 +53,7 @@ parser.add_argument('--decoder-embedding', default=768, type=int)
 parser.add_argument('--replace-image-encoder-with-clip',default= 0,type=int, help='if set to True, the image encoder is replaced with clip image encoder')
 parser.add_argument('--text-embeddings', default='wordvec', type=str, help='the text embedings to load, options=["wordvec","clip"]')
 parser.add_argument('--add-clip-loss', default=0, type=int)
-parser.add_argument('--clip-loss-temp', default=0.1, type=float)
+parser.add_argument('--clip-loss-temp', default=0.1, type=float) #change clip loss
 parser.add_argument('--clip-loss-weight', default=1, type=float)
 parser.add_argument('--classif-loss-weight', default=1.0, type=float)
 parser.add_argument('--gzsl', default=0, type=int)
@@ -61,6 +61,7 @@ parser.add_argument('--gzsl', default=0, type=int)
 parser.add_argument('--resume_training', default=0, type=int)
 parser.add_argument('--exp_name', default = 'test',type= str)
 parser.add_argument('--validate_only', default=0, type=int)
+parser.add_argument('--best_metric', default='mAP', type=str, help='options=["mAP","average"]')
 
 parser.add_argument('--add-clip-head', default=0, type=int)
 
@@ -168,12 +169,11 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, train_loader,
                 inputData = input['image'].cuda()
                 target = input['target'].cuda()  # (batch,3,num_classes)
                 with autocast():  # mixed precision
+                    output, image_embeddings = model(inputData) # sigmoid will be done in loss !
+                    output = output.float()  
                     if args.add_clip_loss:
                         clip_tokens = input['clip_tokens'].cuda()
                         text_features = clip_model.encode_text(clip_tokens)
-                    output, image_embeddings = model(inputData, text_features) # sigmoid will be done in loss !
-                    output = output.float()  
-                    if args.add_clip_loss:
                         clip_loss, _, _ = clip_criterion(image_embeddings, text_features)
                 loss = criterion(output, target) * args.classif_loss_weight
                 if args.add_clip_loss:
@@ -218,39 +218,75 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, train_loader,
 
         mAP_score, f1_3, p_3, r_3, f1_5, p_5, r_5 = validate_multi(args, val_loader, model, ema)
         model.train()
-        if mAP_score > highest_mAP:
-            highest_mAP = mAP_score
-            f1_3_at_highest_mAP = f1_3
-            p_3_at_highest_mAP = p_3
-            r_3_at_highest_mAP = r_3
-            f1_5_at_highest_mAP = f1_5
-            p_5_at_highest_mAP = p_5
-            r_5_at_highest_mAP = r_5
-            try:
-                torch.save(model.state_dict(), os.path.join(
-                    'models', args.exp_name,'model-highest-'+str(epoch)+'.ckpt'))
-            except:
-                pass
-        print('current_mAP = {:.2f}, highest_mAP = {:.2f}\n'.format(mAP_score, highest_mAP))
-        print('current_f1_k3 = {:.2f}, f1_k3_at_highest_mAP = {:.2f}\n'.format(f1_3, f1_3_at_highest_mAP))
-        print('current_p_k3 = {:.2f}, p_k3_at_highest_mAP = {:.2f}\n'.format(p_3, p_3_at_highest_mAP))
-        print('current_r_k3 = {:.2f}, r_k3_at_highest_mAP = {:.2f}\n'.format(r_3, r_3_at_highest_mAP))
-        print('current_f1_k5 = {:.2f}, f1_k5_at_highest_mAP = {:.2f}\n'.format(f1_5, f1_5_at_highest_mAP))
-        print('current_p_k5 = {:.2f}, p_k5_at_highest_mAP = {:.2f}\n'.format(p_5, p_5_at_highest_mAP))
-        print('current_r_k5 = {:.2f}, r_k5_at_highest_mAP = {:.2f}\n'.format(r_5, r_5_at_highest_mAP))
+
+        if args.best_metric == 'mAP':
+            if mAP_score > highest_mAP: 
+                highest_mAP = mAP_score
+                f1_3_at_highest_mAP = f1_3
+                p_3_at_highest_mAP = p_3
+                r_3_at_highest_mAP = r_3
+                f1_5_at_highest_mAP = f1_5
+                p_5_at_highest_mAP = p_5
+                r_5_at_highest_mAP = r_5
+                try:
+                    torch.save(model.state_dict(), os.path.join(
+                        'models', args.exp_name,'model-highest-'+str(epoch)+'.ckpt'))
+                except:
+                    pass
+            print('current_mAP = {:.2f}, highest_mAP = {:.2f}\n'.format(mAP_score, highest_mAP))
+            print('current_f1_k3 = {:.2f}, f1_k3_at_highest_mAP = {:.2f}\n'.format(f1_3, f1_3_at_highest_mAP))
+            print('current_p_k3 = {:.2f}, p_k3_at_highest_mAP = {:.2f}\n'.format(p_3, p_3_at_highest_mAP))
+            print('current_r_k3 = {:.2f}, r_k3_at_highest_mAP = {:.2f}\n'.format(r_3, r_3_at_highest_mAP))
+            print('current_f1_k5 = {:.2f}, f1_k5_at_highest_mAP = {:.2f}\n'.format(f1_5, f1_5_at_highest_mAP))
+            print('current_p_k5 = {:.2f}, p_k5_at_highest_mAP = {:.2f}\n'.format(p_5, p_5_at_highest_mAP))
+            print('current_r_k5 = {:.2f}, r_k5_at_highest_mAP = {:.2f}\n'.format(r_5, r_5_at_highest_mAP))
         
+        elif args.best_metric == 'average':
+            current_average = np.mean([mAP_score, f1_3, p_3, r_3, f1_5, p_5, r_5])
+            if current_average > highest_average:
+                highest_average = current_average
+                f1_3_at_highest_average = f1_3
+                p_3_at_highest_average = p_3
+                r_3_at_highest_average = r_3
+                f1_5_at_highest_average = f1_5
+                p_5_at_highest_average = p_5
+                r_5_at_highest_average = r_5
+                try:
+                    torch.save(model.state_dict(), os.path.join(
+                        'models', args.exp_name,'model-highest-average-'+str(epoch)+'.ckpt'))
+                except:
+                    pass
+            print('current_average = {:.2f}, highest_average = {:.2f}\n'.format(current_average, highest_average))
+            print('current_f1_k3 = {:.2f}, f1_k3_at_highest_average = {:.2f}\n'.format(f1_3, f1_3_at_highest_average))
+            print('current_p_k3 = {:.2f}, p_k3_at_highest_average = {:.2f}\n'.format(p_3, p_3_at_highest_average))
+            print('current_r_k3 = {:.2f}, r_k3_at_highest_average = {:.2f}\n'.format(r_3, r_3_at_highest_average))
+            print('current_f1_k5 = {:.2f}, f1_k5_at_highest_average = {:.2f}\n'.format(f1_5, f1_5_at_highest_average))
+            print('current_p_k5 = {:.2f}, p_k5_at_highest_average = {:.2f}\n'.format(p_5, p_5_at_highest_average))
+            print('current_r_k5 = {:.2f}, r_k5_at_highest_average = {:.2f}\n'.format(r_5, r_5_at_highest_average))
+
+
         if args.validate_only:
             break
-    
-    wandb.log({
-        "highest_mAP": highest_mAP,
-        "f1_3_at_highest_mAP": f1_3_at_highest_mAP,
-        "p_3_at_highest_mAP": p_3_at_highest_mAP,
-        "r_3_at_highest_mAP": r_3_at_highest_mAP,
-        "f1_5_at_highest_mAP": f1_5_at_highest_mAP,
-        "p_5_at_highest_mAP": p_5_at_highest_mAP,
-        "r_5_at_highest_mAP": r_5_at_highest_mAP
-    })
+    if args.best_metric == 'mAP':
+        wandb.log({
+            "highest_mAP": highest_mAP,
+            "f1_3_at_highest_mAP": f1_3_at_highest_mAP,
+            "p_3_at_highest_mAP": p_3_at_highest_mAP,
+            "r_3_at_highest_mAP": r_3_at_highest_mAP,
+            "f1_5_at_highest_mAP": f1_5_at_highest_mAP,
+            "p_5_at_highest_mAP": p_5_at_highest_mAP,
+            "r_5_at_highest_mAP": r_5_at_highest_mAP
+        })
+    elif args.best_metric == 'average':
+        wandb.log({
+            "highest_average": highest_average,
+            "f1_3_at_highest_average": f1_3_at_highest_average,
+            "p_3_at_highest_average": p_3_at_highest_average,
+            "r_3_at_highest_average": r_3_at_highest_average,
+            "f1_5_at_highest_average": f1_5_at_highest_average,
+            "p_5_at_highest_average": p_5_at_highest_average,
+            "r_5_at_highest_average": r_5_at_highest_average
+        })
 
 
 def validate_multi(args, val_loader, model, ema_model):

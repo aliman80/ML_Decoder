@@ -200,7 +200,7 @@ class TResNet(Module):
             block(self.inplanes, planes, use_se=use_se, anti_alias_layer=anti_alias_layer))
         return nn.Sequential(*layers)
 
-    def forward(self, x, text_features):
+    def forward(self, x):
         x = self.body(x)
         self.embeddings = self.global_pool(x)
         logits, image_embeddings = self.head(self.embeddings)
