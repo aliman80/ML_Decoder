@@ -282,32 +282,34 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, trai
             print('current_p_k5 = {:.2f}, p_k5_at_highest_average = {:.2f}\n'.format(p_5, p_5_at_highest_average))
             print('current_r_k5 = {:.2f}, r_k5_at_highest_average = {:.2f}\n'.format(r_5, r_5_at_highest_average))
 
+        if args.best_metric == 'mAP':
+            wandb.log({
+                "highest_mAP": highest_mAP,
+                "f1_3_at_highest_mAP": f1_3_at_highest_mAP,
+                "p_3_at_highest_mAP": p_3_at_highest_mAP,
+                "r_3_at_highest_mAP": r_3_at_highest_mAP,
+                "f1_5_at_highest_mAP": f1_5_at_highest_mAP,
+                "p_5_at_highest_mAP": p_5_at_highest_mAP,
+                "r_5_at_highest_mAP": r_5_at_highest_mAP
+            })
+        elif args.best_metric == 'average':
+            wandb.log({
+                "highest_average": highest_average,
+                "f1_3_at_highest_average": f1_3_at_highest_average,
+                "p_3_at_highest_average": p_3_at_highest_average,
+                "r_3_at_highest_average": r_3_at_highest_average,
+                "f1_5_at_highest_average": f1_5_at_highest_average,
+                "p_5_at_highest_average": p_5_at_highest_average,
+                "r_5_at_highest_average": r_5_at_highest_average
+            })
+        if args.add_clip_loss:
+            logs = {}
+            logs["val_clip_loss"] = torch.mean(torch.Tensor(clip_losses))
+            wandb.log(logs)
+        
 
         if args.validate_only:
             break
-    if args.best_metric == 'mAP':
-        wandb.log({
-            "highest_mAP": highest_mAP,
-            "f1_3_at_highest_mAP": f1_3_at_highest_mAP,
-            "p_3_at_highest_mAP": p_3_at_highest_mAP,
-            "r_3_at_highest_mAP": r_3_at_highest_mAP,
-            "f1_5_at_highest_mAP": f1_5_at_highest_mAP,
-            "p_5_at_highest_mAP": p_5_at_highest_mAP,
-            "r_5_at_highest_mAP": r_5_at_highest_mAP
-        })
-    elif args.best_metric == 'average':
-        wandb.log({
-            "highest_average": highest_average,
-            "f1_3_at_highest_average": f1_3_at_highest_average,
-            "p_3_at_highest_average": p_3_at_highest_average,
-            "r_3_at_highest_average": r_3_at_highest_average,
-            "f1_5_at_highest_average": f1_5_at_highest_average,
-            "p_5_at_highest_average": p_5_at_highest_average,
-            "r_5_at_highest_average": r_5_at_highest_average
-        })
-    if args.add_clip_loss:
-        logs["val_clip_loss"] = torch.mean(torch.Tensor(clip_losses))
-    wandb.log(logs)
 
 def validate_multi(args, val_loader, model, ema_model, clip_model, clip_criterion):
     print("starting validation")
@@ -331,13 +333,13 @@ def validate_multi(args, val_loader, model, ema_model, clip_model, clip_criterio
             with autocast():
                 if args.add_clip_loss:
                     clip_tokens = data_dict['clip_tokens'].cuda()
-                    text_features = clip_model.encode_text(clip_tokens)
-                output_regular, image_embeddings = model(input.cuda(), text_features)
+                output_regular, image_embeddings = model(input.cuda())
                 if args.add_clip_loss:
+                    text_features = clip_model.encode_text(clip_tokens)
                     clip_loss, _, _ = clip_criterion(image_embeddings, text_features)
                     clip_losses.append(clip_loss.item())
                 output_regular = Sig(output_regular).cpu()
-                output_ema, _ = ema_model.module(input.cuda(), text_features)
+                output_ema, _ = ema_model.module(input.cuda())
                 output_ema = Sig(output_ema).cpu()
                 # output_ema = Sig(ema_model.module(input.cuda())).cpu()
 
