@@ -64,9 +64,10 @@
                 "--exp_name", "train_textencodethr0.7",
                 "--thr", "0.7",
                 "--add-clip-loss", "1",
+                "--clip-loss-weight", "0.2",
+                "--classif-loss-weight", "0.8",
                 "--batch-size", "16",
-                "--best_metric", "mAP",
-                "--batch-size", "1",
+                "--best_metric", "average",
 
                 "--use_prompt_learner", "0",
                 "--prompt_learner_n_ctx", "1"

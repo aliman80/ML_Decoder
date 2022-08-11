@@ -1,5 +1,6 @@
 program: train_zsl_nus.py
 method: grid
+name: best_metric_tune
 parameters:
   model-name: 
     value: tresnet_m
@@ -26,4 +27,4 @@ parameters:
   best_metric:
     values: 
       - mAP
-      # - average
+      - average
