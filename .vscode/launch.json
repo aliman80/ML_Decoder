@@ -68,7 +68,7 @@
                 "--best_metric", "average",
                 "--batch-size", "1",
 
-                "--use_prompt_learner", "1",
+                "--use_prompt_learner", "0",
                 "--prompt_learner_n_ctx", "1"
             ]
         }
