@@ -57,8 +57,8 @@ parser.add_argument('--replace-image-encoder-with-clip',default= 0,type=int, hel
 parser.add_argument('--text-embeddings', default='wordvec', type=str, help='the text embedings to load, options=["wordvec","clip"]')
 parser.add_argument('--add-clip-loss', default=0, type=int)
 parser.add_argument('--clip-loss-temp', default=0.1, type=float) #change clip loss
-parser.add_argument('--clip-loss-weight', default=0.1, type=float)
-parser.add_argument('--classif-loss-weight', default=.9, type=float)
+parser.add_argument('--clip-loss-weight', default=1, type=float)
+parser.add_argument('--classif-loss-weight', default=.1, type=float)
 parser.add_argument('--gzsl', default=0, type=int)
 
 parser.add_argument('--resume_training', default=0, type=int)
@@ -161,7 +161,7 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, trai
 
     # set optimizer
     Epochs = 40
-    weight_decay = 1e-2 # 5e-3
+    weight_decay = 1e-3 # 5e-3
     criterion = AsymmetricLoss(gamma_neg=4, gamma_pos=0, clip=0.05, disable_torch_grad_focal_loss=True)
     parameters = add_weight_decay(model, weight_decay)
     optimizer = torch.optim.Adam(params=parameters, lr=lr, weight_decay=0)  # true wd, filter_bias_and_bn
