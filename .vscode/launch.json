@@ -64,8 +64,8 @@
                 "--exp_name", "train_textencodethr0.7",
                 "--thr", "0.7",
                 "--add-clip-loss", "1",
-                "--clip-loss-weight", "1",
-                "--classif-loss-weight", ".1",
+                "--clip-loss-weight", ".1",
+                "--classif-loss-weight", "1",
                 "--batch-size", "56",
                 "--best_metric", "average",
 
