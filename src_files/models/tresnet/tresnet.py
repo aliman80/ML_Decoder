@@ -7,23 +7,23 @@ from .layers.anti_aliasing import AntiAliasDownsampleLayer
 from .layers.avg_pool import FastAvgPool2d
 from src_files.ml_decoder.ml_decoder import MLDecoder
 from .layers.general_layers import SEModule, SpaceToDepthModule
-from inplace_abn import InPlaceABN, ABN
+# from inplace_abn import InPlaceABN, ABN
 
 
 def InplacABN_to_ABN(module: nn.Module) -> nn.Module:
     # convert all InplaceABN layer to bit-accurate ABN layers.
-    if isinstance(module, InPlaceABN):
-        module_new = ABN(module.num_features, activation=module.activation, # activation batch normalizatio layer
-                         activation_param=module.activation_param)
-        for key in module.state_dict():
-            module_new.state_dict()[key].copy_(module.state_dict()[key])
-        module_new.training = module.training
-        module_new.weight.data = module_new.weight.abs() + module_new.eps
-        return module_new
-    for name, child in reversed(module._modules.items()):
-        new_child = InplacABN_to_ABN(child)
-        if new_child != child:
-            module._modules[name] = new_child
+    # if isinstance(module, InPlaceABN):
+    #     module_new = ABN(module.num_features, activation=module.activation, # activation batch normalizatio layer
+    #                      activation_param=module.activation_param)
+    #     for key in module.state_dict():
+    #         module_new.state_dict()[key].copy_(module.state_dict()[key])
+    #     module_new.training = module.training
+    #     module_new.weight.data = module_new.weight.abs() + module_new.eps
+    #     return module_new
+    # for name, child in reversed(module._modules.items()):
+    #     new_child = InplacABN_to_ABN(child)
+    #     if new_child != child:
+    #         module._modules[name] = new_child
     return module
 
 def conv2d(ni, nf, stride):
@@ -38,7 +38,8 @@ def conv2d_ABN(ni, nf, stride, activation="leaky_relu", kernel_size=3, activatio
     return nn.Sequential(
         nn.Conv2d(ni, nf, kernel_size=kernel_size, stride=stride, padding=kernel_size // 2, groups=groups,
                   bias=False),
-        InPlaceABN(num_features=nf, activation=activation, activation_param=activation_param)
+        # InPlaceABN(num_features=nf, activation=activation, activation_param=activation_param)
+        nn.BatchNorm2d(num_features=nf)
     )
 
 
@@ -169,7 +170,7 @@ class TResNet(Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
-            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, InPlaceABN):
+            elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 

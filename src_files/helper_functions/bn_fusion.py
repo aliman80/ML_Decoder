@@ -1,17 +1,17 @@
 import torch
 import torch.nn as nn
-from inplace_abn import ABN
+# from inplace_abn import ABN
 
 
 def calc_activation(ABN_layer):
     activation = None
-    if isinstance(ABN_layer, ABN):
-        if ABN_layer.activation == "relu":
-            activation = nn.ReLU(inplace=True)
-        elif ABN_layer.activation == "leaky_relu":
-            activation = nn.LeakyReLU(negative_slope=ABN_layer.activation_param, inplace=True)
-        elif ABN_layer.activation == "elu":
-            activation = nn.ELU(alpha=ABN_layer.activation_param, inplace=True)
+    # if isinstance(ABN_layer, ABN):
+    #     if ABN_layer.activation == "relu":
+    #         activation = nn.ReLU(inplace=True)
+    #     elif ABN_layer.activation == "leaky_relu":
+    #         activation = nn.LeakyReLU(negative_slope=ABN_layer.activation_param, inplace=True)
+    #     elif ABN_layer.activation == "elu":
+    #         activation = nn.ELU(alpha=ABN_layer.activation_param, inplace=True)
     return activation
 
 
@@ -67,13 +67,12 @@ def fuse_bn_sequential(block):
     if isinstance(block, nn.Sequential) and len(block) == 1 and isinstance(block[0], nn.Sequential):  # 'downsample' layer in tresnet
         block = block[0]
     for m in block.children():
-        if isinstance(m, nn.BatchNorm2d) or isinstance(m, ABN):
+        if isinstance(m, nn.BatchNorm2d):
             if isinstance(stack[-1], nn.Conv2d):
                 fuse_bn_to_conv(m, stack[-1])
-                if isinstance(m, ABN):
-                    activation = calc_activation(m)
-                    if activation is not None:
-                        stack.append(activation)
+                activation = calc_activation(m)
+                if activation is not None:
+                    stack.append(activation)
         elif isinstance(m, nn.BatchNorm1d) and len(stack) > 0 and isinstance(stack[-1], torch.nn.Linear):
             fuse_bn_to_conv(m, stack[-1])
         else:
