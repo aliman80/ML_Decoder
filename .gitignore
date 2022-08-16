@@ -9,6 +9,7 @@ clip_array.pth
 data.csv
 nus_wide.tar.gz
 tresnet_m.pth
+tresnet_m21k.pth
 wordvec_array.pth
 
 
