@@ -87,14 +87,14 @@ def main():
 
     # Setup model
     print('creating model {}...'.format(args.model_name))
-    model = create_model(args).cuda()
+    model = create_model(args)
     print('done')
 
     #NUS-WIDE Data loading
     #json_path = os.path.join(args.data, '/home/muhammad.ali/Desktop/Research/MLDECODER/benchmark_81_v0.json')
     #json_path = os.path.join(args.data, '/home/muhammad.ali/Desktop/Research/MLDECODER/data.csv')
     json_path = os.path.join(args.data, 'benchmark_81_v0.json')
-    wordvec_array = torch.load(os.path.join(args.data, args.text_embeddings+ '_array.pth'))
+    wordvec_array = torch.load(os.path.join(args.data, args.text_embeddings+ '_array.pth'), map_location='cpu')
 
 
     train_transform = transforms.Compose([
@@ -183,13 +183,13 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, trai
             update_wordvecs(model, train_wordvecs)
             
             for i, input in enumerate(train_loader):
-                inputData = input['image'].cuda()
-                target = input['target'].cuda()  # (batch,3,num_classes)
+                inputData = input['image']
+                target = input['target']  # (batch,3,num_classes)
                 with autocast():  # mixed precision
                     output, image_embeddings = model(inputData) # sigmoid will be done in loss !
                     output = output.float()  
                     if args.add_clip_loss:
-                        clip_tokens = input['clip_tokens'].cuda()
+                        clip_tokens = input['clip_tokens']
                         text_features = clip_model.encode_text(clip_tokens)
                         clip_loss, _, _ = clip_criterion(image_embeddings, text_features)
                 loss = criterion(output, target) * args.classif_loss_weight
@@ -333,16 +333,16 @@ def validate_multi(args, val_loader, model, ema_model, clip_model, clip_criterio
         with torch.no_grad():
             with autocast():
                 if args.add_clip_loss:
-                    clip_tokens = data_dict['clip_tokens'].cuda()
-                output_regular, image_embeddings = model(input.cuda())
+                    clip_tokens = data_dict['clip_tokens']
+                output_regular, image_embeddings = model(input)
                 if args.add_clip_loss:
                     text_features = clip_model.encode_text(clip_tokens)
                     clip_loss, _, _ = clip_criterion(image_embeddings, text_features)
                     clip_losses.append(clip_loss.item())
                 output_regular = Sig(output_regular).cpu()
-                output_ema, _ = ema_model.module(input.cuda())
+                output_ema, _ = ema_model.module(input)
                 output_ema = Sig(output_ema).cpu()
-                # output_ema = Sig(ema_model.module(input.cuda())).cpu()
+                # output_ema = Sig(ema_model.module(input)).cpu()
 
         # for mAP calculation
         preds_regular.append(output_regular.cpu().detach())

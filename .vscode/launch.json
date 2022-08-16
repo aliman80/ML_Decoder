@@ -29,22 +29,50 @@
                 "--use-clip-encoder", "1"
             ]
         },
-             {
-                   "name": "infer.py",
-                     "type": "python",
-                     "request": "launch",
-                     "program": "/home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/infer.py",
-                     "console": "integratedTerminal",
-                     "args": [
-                         "--num-classes", "100",
-                         "--model-name",
-                         "tresnet_l",
-                         "--image-size",
-                         "224",
-                         "--th","0.75",
-                         "--model-path","/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_l.pth"
-                     ]
-            },
+            {
+                "name": "infer.py",
+                    "type": "python",
+                    "request": "launch",
+                    "program": "/home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/infer.py",
+                    "console": "integratedTerminal",
+                    "args": [
+                        "--num-classes", "100",
+                        "--model-name",
+                        "tresnet_l",
+                        "--image-size",
+                        "224",
+                        "--th","0.75",
+                        "--model-path","/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_l.pth"
+                    ]
+        },
+        {
+            "name": "train_cluster",
+            "type": "python",
+            "request": "launch",
+            "program": "train_zsl_nus.py",
+            "console": "integratedTerminal",
+            "args": [
+                 "--model-name", "tresnet_m",
+                //  "--resume_training", "1",
+                //  "--model-path", "models/model-highest.ckpt",
+                "--model-path","/home/muhammad.ali/research/ML_Decoder/tresnet_m21k.pth",
+                "--data", "/l/users/muhammad.ali/ML_Decoder_data",
+                "--text-embeddings", "clip",
+                  "--gzsl", "1",
+                "--workers", "3", 
+                // "--validate_only", "1",
+                "--exp_name", "train_textencodethr0.7",
+                "--thr", "0.7",
+                "--add-clip-loss", "1",
+                "--clip-loss-weight", ".1",
+                "--classif-loss-weight", "1",
+                "--batch-size", "56",
+                "--best_metric", "mAP",
+
+                "--use_prompt_learner", "1",
+                // "--prompt_learner_n_ctx", "16"
+            ]
+        },
             
         {
             "name": "train_zsl_nus",
