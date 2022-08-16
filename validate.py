@@ -9,7 +9,7 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 
 from src_files.helper_functions.bn_fusion import fuse_bn_recursively
-from src_files.models.tresnet.tresnet import InplacABN_to_ABN
+from src_files.models.tresnet.tresnet_convnex import InplacABN_to_ABN
 from src_files.helper_functions.helper_functions import mAP, CocoDetection, AverageMeter
 from src_files.models import create_model
 

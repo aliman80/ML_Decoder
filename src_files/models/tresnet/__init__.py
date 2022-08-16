@@ -1,1 +1,1 @@
-from .tresnet import TResnetM, TResnetL, TResnetXL
+from .tresnet_convnex import TResnetM, TResnetL, TResnetXL

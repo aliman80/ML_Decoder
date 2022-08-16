@@ -6,7 +6,7 @@ import h5py
 import pickle
 import pandas as pd
 
-src_att = pickle.load(open('/home/muhammad.ali/Mul_Lab/Generative_MLZSL/datasets/NUS-WIDE/word_embedding/NUS_WIDE_pretrained_clip-512', 'rb'))
+#src_att = pickle.load(open('/home/muhammad.ali/Mul_Lab/Generative_MLZSL/datasets/NUS-WIDE/word_embedding/NUS_WIDE_pretrained_clip-512', 'rb'))
 
 # Load the model
 device = "cuda" if torch.cuda.is_available() else "cpu"

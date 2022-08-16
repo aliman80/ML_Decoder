@@ -11,7 +11,7 @@ from src_files.helper_functions.bn_fusion import fuse_bn_recursively
 from src_files.models import create_model
 import matplotlib
 
-from src_files.models.tresnet.tresnet import InplacABN_to_ABN
+from src_files.models.tresnet.tresnet_convnex import InplacABN_to_ABN
 
 matplotlib.use('TkAgg')
 matplotlib.use('TkAgg')

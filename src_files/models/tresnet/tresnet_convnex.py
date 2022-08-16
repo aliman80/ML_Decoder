@@ -132,36 +132,38 @@ class TResNet(Module):
     def __init__(self, layers, in_chans=3, num_classes=1000, width_factor=1.0, first_two_layers=BasicBlock):
         super(TResNet, self).__init__()
 
-        # JIT layers
-        space_to_depth = SpaceToDepthModule()
-        anti_alias_layer = AntiAliasDownsampleLayer
+        # # JIT layers
+        # space_to_depth = SpaceToDepthModule()
+        # anti_alias_layer = AntiAliasDownsampleLayer
         global_pool_layer = FastAvgPool2d(flatten=True)
 
-        # TResnet stages
-        self.inplanes = int(64 * width_factor)
-        self.planes = int(64 * width_factor)
-        conv1 = conv2d_ABN(in_chans * 16, self.planes, stride=1, kernel_size=3)
-        layer1 = self._make_layer(first_two_layers, self.planes, layers[0], stride=1, use_se=True,
-                                  anti_alias_layer=anti_alias_layer)  # 56x56
-        layer2 = self._make_layer(first_two_layers, self.planes * 2, layers[1], stride=2, use_se=True,
-                                  anti_alias_layer=anti_alias_layer)  # 28x28
-        layer3 = self._make_layer(Bottleneck, self.planes * 4, layers[2], stride=2, use_se=True,
-                                  anti_alias_layer=anti_alias_layer)  # 14x14
-        layer4 = self._make_layer(Bottleneck, self.planes * 8, layers[3], stride=2, use_se=False,
-                                  anti_alias_layer=anti_alias_layer)  # 7x7
+        # # TResnet stages
+        # self.inplanes = int(64 * width_factor)
+        # self.planes = int(64 * width_factor)
+        # conv1 = conv2d_ABN(in_chans * 16, self.planes, stride=1, kernel_size=3)
+        # layer1 = self._make_layer(first_two_layers, self.planes, layers[0], stride=1, use_se=True,
+        #                           anti_alias_layer=anti_alias_layer)  # 56x56
+        # layer2 = self._make_layer(first_two_layers, self.planes * 2, layers[1], stride=2, use_se=True,
+        #                           anti_alias_layer=anti_alias_layer)  # 28x28
+        # layer3 = self._make_layer(Bottleneck, self.planes * 4, layers[2], stride=2, use_se=True,
+        #                           anti_alias_layer=anti_alias_layer)  # 14x14
+        # layer4 = self._make_layer(Bottleneck, self.planes * 8, layers[3], stride=2, use_se=False,
+        #                           anti_alias_layer=anti_alias_layer)  # 7x7
 
-        # body
-        self.body = nn.Sequential(OrderedDict([
-            ('SpaceToDepth', space_to_depth),
-            ('conv1', conv1),
-            ('layer1', layer1),
-            ('layer2', layer2),
-            ('layer3', layer3),
-            ('layer4', layer4)]))
+        # # body
+        # self.body = nn.Sequential(OrderedDict([
+        #     ('SpaceToDepth', space_to_depth),
+        #     ('conv1', conv1),
+        #     ('layer1', layer1),
+        #     ('layer2', layer2),
+        #     ('layer3', layer3),
+        #     ('layer4', layer4)]))
+        import timm
+        self.body = timm.create_model('convnext_base', pretrained=True, num_classes=0, global_pool='')
 
         # head
         self.global_pool = nn.Sequential(OrderedDict([('global_pool_layer', global_pool_layer)]))
-        self.num_features = (self.planes * 8) * Bottleneck.expansion
+        self.num_features = 1024#(self.planes * 8) * Bottleneck.expansion
         fc = nn.Linear(self.num_features, num_classes)
         self.head = nn.Sequential(OrderedDict([('fc', fc)]))
 
@@ -204,8 +206,6 @@ class TResNet(Module):
         x = self.body(x)
         self.embeddings = self.global_pool(x)
         logits, image_embeddings = self.head(self.embeddings)
-        import pdb
-        pdb.set_trace()
         return logits, image_embeddings # i added this term 
 
 

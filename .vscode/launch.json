@@ -58,16 +58,16 @@
                 //  "--model-path", "models/model-highest.ckpt",
                 "--model-path","/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_m21k.pth",
                 "--text-embeddings", "clip",
-                  "--gzsl", "0",
+                  "--gzsl", "1",
                 "--workers", "3", 
                 // "--validate_only", "1",
                 "--exp_name", "train_textencodethr0.7",
                 "--thr", "0.7",
                 "--add-clip-loss", "1",
-                "--batch-size", "1",
+                "--batch-size", "32",
 
-                "--use_prompt_learner", "1",
-                "--prompt_learner_n_ctx", "1"
+                "--use_prompt_learner", "0",
+                "--prompt_learner_n_ctx", "0"
             ]
         }
     ]
