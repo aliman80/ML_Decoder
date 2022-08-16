@@ -54,7 +54,7 @@ def create_model(args,load_head=False):
         if not os.path.exists(model_path):
             print("downloading pretrain model...")
             request.urlretrieve(args.model_path, "./tresnet_m.pth")
-            model_path = "/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_m.pth" #"/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_l.pth"
+            # model_path = "/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_m.pth" #"/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_l.pth"
             print('done')
         state = torch.load(model_path, map_location='cpu')
         if not load_head:
