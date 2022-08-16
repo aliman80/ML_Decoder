@@ -8,7 +8,7 @@ certifi==2022.5.18.1
 cffi==1.13.2
 chardet==3.0.4
 click==8.0.3
-clip==1.0
+clip
 cycler==0.10.0
 Cython==0.29.14
 debugpy==1.5.1
