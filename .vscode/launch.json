@@ -72,6 +72,20 @@
                 "--use_prompt_learner", "0",
                 "--prompt_learner_n_ctx", "1"
             ]
+        },
+        {
+            "name": "infer_nus",
+            "type": "python",
+            "request": "launch",
+            "program": "infer.py",
+            "console": "integratedTerminal",
+            "args": [
+                 "--model-name", "tresnet_m",
+                 "--resume_training", "1",
+                "--model-path","/l/users/muhammad.ali/mld_updated/ML_Decoder/models/test/model-40-2290.ckpt",
+                "--pic-path", "/l/users/muhammad.ali/ML_Decoder/pics/000000000885.jpg",
+                "--text_embeddings", "clip"
+            ]
         }
     ]
 }

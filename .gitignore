@@ -3,6 +3,7 @@
 /pictures/
 /nus_wide/
 /wandb/
+/models/
 
 classes.csv
 clip_array.pth

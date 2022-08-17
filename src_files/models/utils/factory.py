@@ -41,7 +41,8 @@ def create_model(args,load_head=False):
         model.body = clip_model.visual
     
     if args.resume_training:
-        model.load_state_dict(torch.load(args.model_path))
+        state = torch.load(args.model_path)
+        model.load_state_dict(state)
         return model
 
     # loading pretrain model
@@ -67,7 +68,22 @@ def create_model(args,load_head=False):
             model.load_state_dict(filtered_dict, strict=False)
         else:
             model.load_state_dict(state[key], strict=True)
-            
+
+    # # loading pretrain model
+    # model_path = args.model_path
+    # if args.model_name == 'tresnet_l' and os.path.exists("./tresnet_l.pth"):
+    #     model_path = "./tresnet_l.pth"
+    # if model_path:  # make sure to load pretrained model
+    #     if not os.path.exists(model_path):
+    #         print("downloading pretrain model...")
+    #         request.urlretrieve(args.model_path, "./tresnet_l.pth")
+    #         model_path = "./tresnet_l.pth"
+    #         print('done')
+    #     state = torch.load(model_path, map_location='cpu')
+    #     filtered_dict = {k: v for k, v in state['model'].items() if
+    #                      (k in model.state_dict() and 'head.fc' not in k)}
+    #     model.load_state_dict(filtered_dict, strict=False)
+     
 
     return model
     

@@ -1,6 +1,6 @@
 program: train_zsl_nus.py
 method: grid
-name: best_metric_tune
+name: clip_effect
 parameters:
   model-name: 
     value: tresnet_m
@@ -11,20 +11,22 @@ parameters:
   workers:
     value: 3
   exp_name:
-    value: tune
+    value: clip_effect
   add-clip-loss:
-    value: 1
+    values:
+      - 0 
+      - 1
   batch-size:
     value: 16
-  clip-loss-weight:
-    values:
-      - 0.5
-      - 0.1
-  clip-loss-temp:
-    values:
-      - 0.3
-      - 0.6
+  # clip-loss-weight:
+  #   values:
+  #     - 0.5
+  #     - 0.1
+  # clip-loss-temp:
+  #   values:
+  #     - 0.3
+  #     - 0.6
   best_metric:
     values: 
       - mAP
-      - average
+      # - average

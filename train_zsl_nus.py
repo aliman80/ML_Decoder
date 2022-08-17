@@ -57,8 +57,8 @@ parser.add_argument('--replace-image-encoder-with-clip',default= 0,type=int, hel
 parser.add_argument('--text-embeddings', default='wordvec', type=str, help='the text embedings to load, options=["wordvec","clip"]')
 parser.add_argument('--add-clip-loss', default=0, type=int)
 parser.add_argument('--clip-loss-temp', default=0.1, type=float) #change clip loss
-parser.add_argument('--clip-loss-weight', default=1, type=float)
-parser.add_argument('--classif-loss-weight', default=.1, type=float)
+parser.add_argument('--clip-loss-weight', default=0.1, type=float)
+parser.add_argument('--classif-loss-weight', default=1, type=float)
 parser.add_argument('--gzsl', default=0, type=int)
 
 parser.add_argument('--resume_training', default=0, type=int)
@@ -89,6 +89,9 @@ def main():
     print('creating model {}...'.format(args.model_name))
     model = create_model(args).cuda()
     print('done')
+    exp_path = os.path.join('/l/users/muhammad.ali/ML_Decoder/models', args.exp_name)
+    if not os.path.exists(exp_path):
+        os.mkdir(exp_path)
 
     #NUS-WIDE Data loading
     #json_path = os.path.join(args.data, '/home/muhammad.ali/Desktop/Research/MLDECODER/benchmark_81_v0.json')
@@ -218,9 +221,9 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, trai
                         .format(epoch, Epochs, str(i).zfill(3), str(steps_per_epoch).zfill(3),
                                 scheduler.get_last_lr()[0], \
                                 loss.item()))
-                    wandb.log({"loss": loss})
+                    wandb.log({"loss": loss, "epoch": epoch})
                     if args.add_clip_loss:
-                        wandb.log({"clip_loss": clip_loss})
+                        wandb.log({"clip_loss": clip_loss, "epoch": epoch})
 
             try:
                 torch.save(model.state_dict(), os.path.join(
@@ -234,7 +237,6 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, trai
        
 
         mAP_score, f1_3, p_3, r_3, f1_5, p_5, r_5, clip_losses = validate_multi(args, val_loader, model, ema, clip_model, clip_criterion)
-        model.train()
         if args.add_clip_loss:
             print('current_clip_loss = {:.2f}\n'.format(torch.mean(torch.Tensor(clip_losses))))
 
@@ -249,7 +251,7 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, trai
                 r_5_at_highest_mAP = r_5
                 try:
                     torch.save(model.state_dict(), os.path.join(
-                        'models', args.exp_name,'model-highest-'+str(epoch)+'.ckpt'))
+                        '/l/users/muhammad.ali/ML_Decoder/models', args.exp_name,'model-highest-'+str(epoch)+'.ckpt'))
                 except:
                     pass
             print('current_mAP = {:.2f}, highest_mAP = {:.2f}\n'.format(mAP_score, highest_mAP))
@@ -272,7 +274,7 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, trai
                 r_5_at_highest_average = r_5
                 try:
                     torch.save(model.state_dict(), os.path.join(
-                        'models', args.exp_name,'model-highest-average-'+str(epoch)+'.ckpt'))
+                        '/l/users/muhammad.ali/ML_Decoder/models', args.exp_name,'model-highest-average-'+str(epoch)+'.ckpt'))
                 except:
                     pass
             print('current_average = {:.2f}, highest_average = {:.2f}\n'.format(current_average, highest_average))
@@ -291,7 +293,8 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, trai
                 "r_3_at_highest_mAP": r_3_at_highest_mAP,
                 "f1_5_at_highest_mAP": f1_5_at_highest_mAP,
                 "p_5_at_highest_mAP": p_5_at_highest_mAP,
-                "r_5_at_highest_mAP": r_5_at_highest_mAP
+                "r_5_at_highest_mAP": r_5_at_highest_mAP,
+                "epoch": epoch
             })
         elif args.best_metric == 'average':
             wandb.log({
@@ -301,14 +304,15 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, trai
                 "r_3_at_highest_average": r_3_at_highest_average,
                 "f1_5_at_highest_average": f1_5_at_highest_average,
                 "p_5_at_highest_average": p_5_at_highest_average,
-                "r_5_at_highest_average": r_5_at_highest_average
+                "r_5_at_highest_average": r_5_at_highest_average,
+                "epoch": epoch
             })
         if args.add_clip_loss:
-            logs = {}
+            logs = {"epoch": epoch}
             logs["val_clip_loss"] = torch.mean(torch.Tensor(clip_losses))
             wandb.log(logs)
         
-
+        model.train()
         if args.validate_only:
             break
 
