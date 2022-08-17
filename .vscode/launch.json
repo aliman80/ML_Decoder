@@ -82,9 +82,10 @@
             "args": [
                  "--model-name", "tresnet_m",
                  "--resume_training", "1",
-                "--model-path","/l/users/muhammad.ali/mld_updated/ML_Decoder/models/test/model-40-2290.ckpt",
-                "--pic-path", "/l/users/muhammad.ali/ML_Decoder/pics/000000000885.jpg",
-                "--text_embeddings", "clip"
+                "--model-path","/home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/models/model-22-2319.ckpt",
+                "--pic-path", "/l/users/muhammad.ali/ML_Decoder/pics/1825_2653670437_799a61c1af_m.jpg",
+                "--text_embeddings", "clip",
+                "--th", "0.7"
             ]
         }
     ]

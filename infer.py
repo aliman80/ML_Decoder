@@ -79,7 +79,7 @@ def main():
     train_cls_ids, _, test_cls_ids = get_class_ids_split(json_path, idx_to_class)
     train_wordvecs = wordvec_array[..., train_cls_ids].to(torch.float16)
     test_wordvecs = wordvec_array[..., test_cls_ids].to(torch.float16)
-    update_wordvecs(model, test_wordvecs)
+    update_wordvecs(model, train_wordvecs=train_wordvecs)
     print('done\n')
 
     # doing inference
