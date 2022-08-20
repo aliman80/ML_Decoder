@@ -131,8 +131,8 @@ class MLDecoder(nn.Module):
         if self.zsl:
             if text_embedding == 'wordvec' and decoder_embedding != 300:
                 self.wordvec_proj = nn.Linear(300, decoder_embedding)
-            elif text_embedding == 'clip' and decoder_embedding != 512:
-                self.wordvec_proj = nn.Linear(512, decoder_embedding)
+            elif text_embedding == 'clip' and decoder_embedding != 1024:
+                self.wordvec_proj = nn.Linear(1024, decoder_embedding)
             else:
                 self.wordvec_proj = nn.Identity()
             self.decoder.duplicate_pooling = torch.nn.Parameter(torch.Tensor(decoder_embedding, 1))

@@ -21,7 +21,7 @@ token_1k = []
 
 for v in classes.values:
     class_name = v[1]
-    sen = 'a photo of ' + class_name
+    sen = 'a picture of ' + class_name
     sen_tok = clip.tokenize(sen)
     token_1k.append(sen_tok)
 tensor_1k = torch.cat(token_1k,0).to(device)
@@ -29,5 +29,6 @@ tensor_1k = torch.cat(token_1k,0).to(device)
 with torch.no_grad():
     feat_1k =  model.encode_text(tensor_1k)
 
-path = '/home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/wordvec_array_clip.pth'
+#path = '/home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/wordvec_array_clip_pic.pth'
+path = '/l/users/muhammad.ali/ML_Decoder/picture-clip/wordvec_array_clip_realpicture.pth'
 torch.save(feat_1k, path)

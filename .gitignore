@@ -4,6 +4,8 @@
 /nus_wide/
 /wandb/
 /models/
+/picture-clip/
+/clip-
 
 classes.csv
 clip_array.pth

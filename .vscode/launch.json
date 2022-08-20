@@ -57,14 +57,20 @@
                 //  "--resume_training", "1",
                 //  "--model-path", "models/model-highest.ckpt",
                 "--model-path","/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_m21k.pth",
-                "--text-embeddings", "clip",
-                  "--gzsl", "1",
-                "--workers", "3", 
+                "--text-embeddings", "wordvec",
+                "--clip-prompt", "a picture containing",
+                "--gzsl", "0",
+                "--workers", "16", 
                 // "--validate_only", "1",
                 "--exp_name", "train_textencodethr0.7",
                 "--thr", "0.7",
+                
                 "--add-clip-loss", "1",
                 "--clip-loss-weight", ".1",
+
+                "--add-distil-loss", "1",
+                "--distil-loss-weight", ".1",
+
                 "--classif-loss-weight", "1",
                 "--batch-size", "56",
                 "--best_metric", "average",
@@ -83,9 +89,9 @@
                  "--model-name", "tresnet_m",
                  "--resume_training", "1",
                 "--model-path","/home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/models/model-22-2319.ckpt",
-                "--pic-path", "/l/users/muhammad.ali/ML_Decoder/pics/1825_2653670437_799a61c1af_m.jpg",
+                "--pic-path", "/l/users/muhammad.ali/ML_Decoder/pics/0514_825130563.jpg",
                 "--text_embeddings", "clip",
-                "--th", "0.7"
+                "--th", "0.6"
             ]
         }
     ]

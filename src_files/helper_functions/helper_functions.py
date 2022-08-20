@@ -343,7 +343,7 @@ class DatasetFromList(data.Dataset):
         target = labels.astype('float32')
         return target
 
-def parse_csv_data(dataset_local_path, metadata_local_path):
+def parse_csv_data(args, dataset_local_path, metadata_local_path):
     try:
         df = pd.read_csv(os.path.join(metadata_local_path, "data.csv"))
     except FileNotFoundError:
@@ -368,7 +368,7 @@ def parse_csv_data(dataset_local_path, metadata_local_path):
 
     image_sentences_list = []
     for img_list in image_labels_list:
-        sen = 'a photo of '
+        sen = args.clip_prompt 
         for i in range(len(img_list)):
             if len(sen + img_list[i]) < 77:
                 if i == len(img_list) - 2:
@@ -397,7 +397,7 @@ def multilabel2numeric(multilabels):
 def get_datasets_from_csv(args, dataset_local_path, metadata_local_path, train_transform,
                           val_transform, json_path):
 
-    images_path_list, image_labels_list, image_sentences_list, train_idx, valid_idx = parse_csv_data(dataset_local_path, metadata_local_path)
+    images_path_list, image_labels_list, image_sentences_list, train_idx, valid_idx = parse_csv_data(args, dataset_local_path, metadata_local_path)
     labels, class_to_idx, idx_to_class = multilabel2numeric(image_labels_list)
 
     images_path_list_train = [images_path_list[idx] for idx in train_idx]
@@ -413,13 +413,33 @@ def get_datasets_from_csv(args, dataset_local_path, metadata_local_path, train_t
     if args.gzsl:
         test_cls_ids = np.concatenate((train_cls_ids,test_cls_ids))
     
-    train_dl = DatasetFromList(dataset_local_path, images_path_list_train, image_labels_list_train, image_sentences_list_train, args.add_clip_loss,
+    train_dl = DatasetFromList(dataset_local_path, images_path_list_train, image_labels_list_train, image_sentences_list_train, args.add_clip_loss or args.add_distil_loss,
                                idx_to_class, 
                                transform=train_transform, class_ids=train_cls_ids)
 
-    val_dl = DatasetFromList(dataset_local_path, images_path_list_val, image_labels_list_val, image_sentences_list_val, args.add_clip_loss, 
+    val_dl = DatasetFromList(dataset_local_path, images_path_list_val, image_labels_list_val, image_sentences_list_val, args.add_clip_loss or args.add_distil_loss, 
                               idx_to_class, 
                               transform=val_transform, class_ids=test_cls_ids)
 
     classnames = list(set(itertools.chain.from_iterable(image_labels_list)))
     return train_dl, val_dl, train_cls_ids, test_cls_ids, classnames
+
+
+def generate_clip_array(args, model, device):
+    # device = "cuda" if torch.cuda.is_available() else "cpu"
+    # model, preprocess = clip.load('ViT-B/32', device)
+    path = os.path.join(args.data, 'classes.csv')
+    classes = pd.read_csv(path, header=None)
+    token_1k = []
+    for v in classes.values:
+        class_name = v[1]
+        sen = args.clip_prompt + class_name
+        sen_tok = clip.tokenize(sen)
+        token_1k.append(sen_tok)
+    tensor_1k = torch.cat(token_1k,0).to(device)
+
+    with torch.no_grad():
+        feat_1k =  model.encode_text(tensor_1k)
+    
+    return feat_1k.T
+    

@@ -1,6 +1,6 @@
 program: train_zsl_nus.py
 method: grid
-name: clip_effect_2
+name: distil_prompts
 parameters:
   model-name: 
     value: tresnet_m
@@ -8,13 +8,18 @@ parameters:
     value: /home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_m21k.pth
   text-embeddings:
     value: clip
+  clip-prompt:
+    values:
+      - "a photo of "
+      - "a picture of "
+      - "a photo containing "
   workers:
     value: 3
   exp_name:
-    value: clip_effect_2
+    value: distil_prompts
   add-clip-loss:
     values:
-      - 0 
+      # - 0 
       - 1
   batch-size:
     value: 56
@@ -33,4 +38,9 @@ parameters:
   gzsl:
     values:
       - 0
+      # - 1
+  add-distil-loss:
+    values:
+      # - 0
       - 1
+  
