@@ -11,10 +11,10 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 from torch.optim import lr_scheduler
 
-from src_files.helper_functions.helper_functions import mAP, f1, CutoutPIL, ModelEma, \
+from src_files.helper_functions.helper_functions import generate_clip_array, mAP, f1, CutoutPIL, ModelEma, \
     add_weight_decay, get_datasets_from_csv, update_wordvecs
 from src_files.models import create_model
-from src_files.loss_functions.losses import AsymmetricLoss, CLIPLoss
+from src_files.loss_functions.losses import AsymmetricLoss, CLIPLoss, DistillationLoss
 
 from randaugment import RandAugment
 from torch.cuda.amp import GradScaler, autocast
@@ -55,9 +55,12 @@ parser.add_argument('--decoder-embedding', default=768, type=int)
 # CLIP
 parser.add_argument('--replace-image-encoder-with-clip',default= 0,type=int, help='if set to True, the image encoder is replaced with clip image encoder')
 parser.add_argument('--text-embeddings', default='wordvec', type=str, help='the text embedings to load, options=["wordvec","clip"]')
+parser.add_argument('--clip-prompt', default='a photo of ', type=str, help='prompt to be used to generate clip image label embeddings and class embeddings (if text-embeddings == "clip")')
 parser.add_argument('--add-clip-loss', default=0, type=int)
 parser.add_argument('--clip-loss-temp', default=0.1, type=float) #change clip loss
 parser.add_argument('--clip-loss-weight', default=0.1, type=float)
+parser.add_argument('--add-distil-loss', default=0, type=int)
+parser.add_argument('--distil-loss-weight', default=1, type=float)
 parser.add_argument('--classif-loss-weight', default=1, type=float)
 parser.add_argument('--gzsl', default=0, type=int)
 
@@ -92,13 +95,25 @@ def main():
     exp_path = os.path.join('/l/users/muhammad.ali/ML_Decoder/models', args.exp_name)
     if not os.path.exists(exp_path):
         os.mkdir(exp_path)
+    
+
+    clip_model = None
+    clip_criterion = None
+    pl_clip = None
+    distil_criterion = None
+    if args.add_clip_loss or args.add_distil_loss or args.text_embeddings == 'clip':
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        clip_model, _ = clip.load('RN50', device)
 
     #NUS-WIDE Data loading
     #json_path = os.path.join(args.data, '/home/muhammad.ali/Desktop/Research/MLDECODER/benchmark_81_v0.json')
     #json_path = os.path.join(args.data, '/home/muhammad.ali/Desktop/Research/MLDECODER/data.csv')
     json_path = os.path.join(args.data, 'benchmark_81_v0.json')
-    wordvec_array = torch.load(os.path.join(args.data, args.text_embeddings+ '_array.pth'))
-
+    if args.text_embeddings == 'wordvec':
+        wordvec_array = torch.load(os.path.join(args.data, args.text_embeddings+ '_array.pth'))
+    elif args.text_embeddings == 'clip':
+        # wordvec_array = torch.load(os.path.join(args.data, 'clip_embeddings', args.clip_prompt, args.text_embeddings + '_array.pth'))
+        wordvec_array = generate_clip_array(args, clip_model, device)
 
     train_transform = transforms.Compose([
                                       transforms.Resize((args.image_size, args.image_size)),
@@ -142,24 +157,25 @@ def main():
         val_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=False)
 
-    clip_model = None
-    clip_criterion = None
-    pl_clip = None
     if args.add_clip_loss:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        clip_model, _ = clip.load('RN50', device)
         clip_criterion = CLIPLoss(args.clip_loss_temp, args.decoder_embedding, 1024, 512, device)
     
         if args.use_prompt_learner:
             pl_clip = PLCLIP(args, classnames, clip_model, device)
+    
+    if args.add_distil_loss:
+        distil_criterion = DistillationLoss(args.num_classes, 1024, device)
+
+    
+        
         
     tmul.set_sharing_strategy('file_system')
     # Actuall Training
-    train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, train_loader, val_loader, args.lr, train_wordvecs, test_wordvecs)
+    train_multi_label_zsl(args, model, train_loader, val_loader, args.lr, train_wordvecs, test_wordvecs, clip_model, clip_criterion, pl_clip, distil_criterion)
 
 
-def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, train_loader, val_loader, lr, train_wordvecs=None,
-                          test_wordvecs=None):
+def train_multi_label_zsl(args, model, train_loader, val_loader, lr, train_wordvecs=None,
+                          test_wordvecs=None, clip_model=None, clip_criterion=None, pl_clip=None, distil_criterion=None):
     ema = ModelEma(model, 0.9997)  # 0.9997^641=0.82
 
     # set optimizer
@@ -168,9 +184,13 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, trai
     criterion = AsymmetricLoss(gamma_neg=4, gamma_pos=0, clip=0.05, disable_torch_grad_focal_loss=True)
     parameters = add_weight_decay(model, weight_decay)
     optimizer = torch.optim.Adam(params=parameters, lr=lr, weight_decay=0)  # true wd, filter_bias_and_bn
-    if args.add_clip_loss:
-        optimizer.add_param_group({'params': list(clip_model.parameters()) + list(clip_criterion.parameters())})
+    if args.add_clip_loss or args.add_distil_loss or args.text_embeddings == 'clip':
+        optimizer.add_param_group({'params': list(clip_model.parameters())})
+        if args.add_clip_loss:
+            optimizer.add_param_group({'params': list(clip_criterion.parameters())})
         # clip_optimizer = torch.optim.Adam(params=list(clip_model.parameters()) + list(clip_criterion.parameters()), lr=lr, weight_decay=0)
+        if args.add_distil_loss:
+            optimizer.add_param_group({'params': list(distil_criterion.parameters())})
     steps_per_epoch =  len(train_loader)
     scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=lr, steps_per_epoch=steps_per_epoch, epochs=Epochs,
                                         pct_start=0.2)
@@ -191,16 +211,17 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, trai
                 with autocast():  # mixed precision
                     output, image_embeddings = model(inputData) # sigmoid will be done in loss !
                     output = output.float()  
-                    if args.add_clip_loss:
+                    loss = criterion(output, target) * args.classif_loss_weight
+                    if args.add_clip_loss or args.add_distil_loss:
                         clip_tokens = input['clip_tokens'].cuda()
                         text_features = clip_model.encode_text(clip_tokens)
-                        clip_loss, _, _ = clip_criterion(image_embeddings, text_features)
-                loss = criterion(output, target) * args.classif_loss_weight
-                if args.add_clip_loss:
-                    loss += clip_loss * args.clip_loss_weight
-                    # clip_loss.backward()
-                    # clip_optimizer.step()
-                    # clip_optimizer.zero_grad()
+                        if args.add_clip_loss:    
+                            clip_loss, _, _ = clip_criterion(image_embeddings, text_features)
+                            loss += clip_loss * args.clip_loss_weight
+                        if args.add_distil_loss:
+                            distil_loss = distil_criterion(output, text_features)
+                            loss += distil_loss * args.distil_loss_weight
+                        
 
                 model.zero_grad()
 
@@ -224,6 +245,8 @@ def train_multi_label_zsl(args, model, clip_model, clip_criterion, pl_clip, trai
                     wandb.log({"loss": loss, "epoch": epoch})
                     if args.add_clip_loss:
                         wandb.log({"clip_loss": clip_loss, "epoch": epoch})
+                    if args.add_distil_loss:
+                        wandb.log({"distil_loss": distil_loss, "epoch": epoch})
 
             try:
                 torch.save(model.state_dict(), os.path.join(

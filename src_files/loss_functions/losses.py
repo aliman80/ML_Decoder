@@ -176,3 +176,17 @@ class CLIPLoss(nn.Module):
         loss = (loss_i + loss_j) / 2.0
 
         return loss.mean(), loss_i.mean(), loss_j.mean()
+
+
+
+class DistillationLoss(nn.Module):
+    def __init__(self, img_latent_size, text_latent_size, device):
+        super().__init__()
+        self.device = device
+        self.text_projection = nn.Parameter(torch.randn(text_latent_size, img_latent_size)).to(self.device)
+        self.bce = nn.BCEWithLogitsLoss(reduction='mean')
+    
+    def forward(self, img_embed, text_embed):
+        text_proj = text_embed @ self.text_projection
+        loss = self.bce(img_embed, text_proj)
+        return loss
