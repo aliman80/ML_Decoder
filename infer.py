@@ -75,7 +75,7 @@ def main():
     idx_to_class = pd.read_csv(os.path.join(args.classes_file_dir, 'classes.csv'), header=None, index_col=0).to_dict()[1]
     classes_list = np.array(list(idx_to_class.values()))
     json_path = os.path.join(args.data, 'benchmark_81_v0.json')
-    wordvec_array = torch.load(os.path.join(args.data, args.text_embeddings+ '_array.pth'))
+    wordvec_array = torch.load(os.path.join(args.data, args.text_embeddings+ '_array.pth')).T
     train_cls_ids, _, test_cls_ids = get_class_ids_split(json_path, idx_to_class)
     train_wordvecs = wordvec_array[..., train_cls_ids].to(torch.float16)
     test_wordvecs = wordvec_array[..., test_cls_ids].to(torch.float16)

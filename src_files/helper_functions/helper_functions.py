@@ -426,8 +426,8 @@ def get_datasets_from_csv(args, dataset_local_path, metadata_local_path, train_t
 
 
 def generate_clip_array(args, model, device):
-    # device = "cuda" if torch.cuda.is_available() else "cpu"
-    # model, preprocess = clip.load('ViT-B/32', device)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model, preprocess = clip.load('ViT-B/32', device)
     path = os.path.join(args.data, 'classes.csv')
     classes = pd.read_csv(path, header=None)
     token_1k = []
