@@ -56,10 +56,11 @@ parser.add_argument('--decoder-embedding', default=768, type=int)
 parser.add_argument('--replace-image-encoder-with-clip',default= 0,type=int, help='if set to True, the image encoder is replaced with clip image encoder')
 parser.add_argument('--text-embeddings', default='wordvec', type=str, help='the text embedings to load, options=["wordvec","clip"]')
 parser.add_argument('--clip-prompt', default='a photo of ', type=str, help='prompt to be used to generate clip image label embeddings and class embeddings (if text-embeddings == "clip")')
-parser.add_argument('--add-clip-loss', default=0, type=int)
+parser.add_argument('--add-clip-loss', default=1, type=int)
+parser.add_argument('--freeze-clip', default=0, type=int)
 parser.add_argument('--clip-loss-temp', default=0.1, type=float) #change clip loss
 parser.add_argument('--clip-loss-weight', default=0.1, type=float)
-parser.add_argument('--add-distil-loss', default=0, type=int)
+parser.add_argument('--add-distil-loss', default=1, type=int)
 parser.add_argument('--distil-loss-weight', default=1, type=float)
 parser.add_argument('--classif-loss-weight', default=1, type=float)
 parser.add_argument('--gzsl', default=0, type=int)
@@ -104,6 +105,11 @@ def main():
     if args.add_clip_loss or args.add_distil_loss or args.text_embeddings == 'clip':
         device = "cuda" if torch.cuda.is_available() else "cpu"
         clip_model, _ = clip.load('RN50', device)
+        if args.freeze_clip:
+            # Freeze CLIP's weights
+            for param in clip_model.parameters():
+                param.requires_grad = False
+
 
     #NUS-WIDE Data loading
     #json_path = os.path.join(args.data, '/home/muhammad.ali/Desktop/Research/MLDECODER/benchmark_81_v0.json')

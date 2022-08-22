@@ -39,7 +39,7 @@ def create_model(args,load_head=False):
         clip_model, preprocess = clip.load('RN50', device)
         clip_model.visual.attnpool = nn.Identity()
         model.body = clip_model.visual
-    
+
     if args.resume_training:
         state = torch.load(args.model_path)
         model.load_state_dict(state)

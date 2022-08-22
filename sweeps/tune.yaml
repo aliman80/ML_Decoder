@@ -7,14 +7,17 @@ parameters:
   model-path:
     value: /home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_m21k.pth
   text-embeddings:
-    value: clip
+    values: 
+      - clip
+      # - wordvec
   clip-prompt:
     values:
       - "a photo of "
       - "a picture of "
       - "a photo containing "
+      - "a "
   workers:
-    value: 3
+    value: 16
   exp_name:
     value: distil_prompts
   add-clip-loss:

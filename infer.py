@@ -37,7 +37,7 @@ parser.add_argument('--zsl', default=0, type=int)
 # parser.add_argument('gzsl', default =0,typ =int)
 
 parser.add_argument('--resume_training', default=0, type=int)
-parser.add_argument('--text_embeddings', default='clip', type=str, help='options: [clip, wordvec]')
+parser.add_argument('--text_embeddings', default='wordvec', type=str, help='options: [clip, wordvec]')
 parser.add_argument('--replace-image-encoder-with-clip',default= 0,type=int, help='if set to True, the image encoder is replaced with clip image encoder')
 parser.add_argument('--classes_file_dir', type=str, default='/home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/')
 parser.add_argument('--data', type=str, default='/home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/')
@@ -96,8 +96,8 @@ def main():
     ## Top-k predictions
     # detected_classes = classes_list[np_output > args.th]
     idx_sort = np.argsort(-np_output)
-    detected_classes = np.array(classes_list)[idx_sort][: args.top_k]
-    scores = np_output[idx_sort][: args.top_k]
+    detected_classes = np.array(classes_list)[idx_sort][1: args.top_k]
+    scores = np_output[idx_sort][1: args.top_k]
     print(scores)
     idx_th = scores > args.th
     detected_classes = detected_classes[idx_th]
