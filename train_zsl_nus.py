@@ -63,6 +63,9 @@ parser.add_argument('--clip-loss-weight', default=0.1, type=float)
 parser.add_argument('--add-distil-loss', default=1, type=int)
 parser.add_argument('--distil-loss-weight', default=1, type=float)
 parser.add_argument('--classif-loss-weight', default=1, type=float)
+parser.add_argument('--clip-loss-temp', default=0.1, type=float)
+parser.add_argument('--clip-loss-weight', default= 1, type=float)
+parser.add_argument('--classif-loss-weight', default=.1, type=float)
 parser.add_argument('--gzsl', default=0, type=int)
 
 parser.add_argument('--resume_training', default=0, type=int)
@@ -163,7 +166,12 @@ def main():
         val_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=False)
 
+    clip_model = None
+    clip_criterion = None
+    pl_clip = None
     if args.add_clip_loss:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        clip_model, _ = clip.load('RN50', device)
         clip_criterion = CLIPLoss(args.clip_loss_temp, args.decoder_embedding, 1024, 512, device)
     
         if args.use_prompt_learner:
@@ -171,10 +179,10 @@ def main():
     
     if args.add_distil_loss:
         distil_criterion = DistillationLoss(args.num_classes, 1024, device)
-
-    
-        
-        
+     
+     
+     
+     
     tmul.set_sharing_strategy('file_system')
     # Actuall Training
     train_multi_label_zsl(args, model, train_loader, val_loader, args.lr, train_wordvecs, test_wordvecs, clip_model, clip_criterion, pl_clip, distil_criterion)
@@ -192,11 +200,11 @@ def train_multi_label_zsl(args, model, train_loader, val_loader, lr, train_wordv
     optimizer = torch.optim.Adam(params=parameters, lr=lr, weight_decay=0)  # true wd, filter_bias_and_bn
     if args.add_clip_loss or args.add_distil_loss or args.text_embeddings == 'clip':
         optimizer.add_param_group({'params': list(clip_model.parameters())})
-        if args.add_clip_loss:
-            optimizer.add_param_group({'params': list(clip_criterion.parameters())})
-        # clip_optimizer = torch.optim.Adam(params=list(clip_model.parameters()) + list(clip_criterion.parameters()), lr=lr, weight_decay=0)
-        if args.add_distil_loss:
-            optimizer.add_param_group({'params': list(distil_criterion.parameters())})
+    if args.add_clip_loss:
+                    optimizer.add_param_group({'params': list(clip_criterion.parameters())})
+       # clip_optimizer = torch.optim.Adam(params=list(clip_model.parameters()) + list(clip_criterion.parameters()), lr=lr, weight_decay=0)
+    if args.add_distil_loss:
+        optimizer.add_param_group({'params': list(distil_criterion.parameters())})
     steps_per_epoch =  len(train_loader)
     scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=lr, steps_per_epoch=steps_per_epoch, epochs=Epochs,
                                         pct_start=0.2)
@@ -214,20 +222,28 @@ def train_multi_label_zsl(args, model, train_loader, val_loader, lr, train_wordv
             for i, input in enumerate(train_loader):
                 inputData = input['image'].cuda()
                 target = input['target'].cuda()  # (batch,3,num_classes)
-                with autocast():  # mixed precision
-                    output, image_embeddings = model(inputData) # sigmoid will be done in loss !
+                with autocast():  # mixed precisionv
+                    if args.add_clip_loss:
+                        if args.use_prompt_learner:
+                            text_features = pl_clip()
+                        else:
+                            clip_tokens = input['clip_tokens'].cuda()
+                            text_features = clip_model.encode_text(clip_tokens)
+                    output, image_embeddings = model(inputData, text_features) # sigmoid will be done in loss !
                     output = output.float()  
-                    loss = criterion(output, target) * args.classif_loss_weight
-                    if args.add_clip_loss or args.add_distil_loss:
-                        clip_tokens = input['clip_tokens'].cuda()
-                        text_features = clip_model.encode_text(clip_tokens)
-                        if args.add_clip_loss:    
-                            clip_loss, _, _ = clip_criterion(image_embeddings, text_features)
-                            loss += clip_loss * args.clip_loss_weight
-                        if args.add_distil_loss:
-                            distil_loss = distil_criterion(output, text_features)
-                            loss += distil_loss * args.distil_loss_weight
+                    if args.add_clip_loss:
+                        clip_loss, _, _ = clip_criterion(image_embeddings, text_features)
+                loss = criterion(output, target) * args.classif_loss_weight
+                if args.add_clip_loss:
+                    loss += clip_loss * args.clip_loss_weight
+                    # clip_loss.backward()
+                    # clip_optimizer.step()
+                    # clip_optimizer.zero_grad()
+                if args.add_distil_loss:
+                    distil_loss = distil_criterion(output, text_features)
+                    loss += distil_loss * args.distil_loss_weight
                         
+
 
                 model.zero_grad()
 
@@ -280,7 +296,7 @@ def train_multi_label_zsl(args, model, train_loader, val_loader, lr, train_wordv
                 r_5_at_highest_mAP = r_5
                 try:
                     torch.save(model.state_dict(), os.path.join(
-                        '/l/users/muhammad.ali/ML_Decoder/models', args.exp_name,'model-highest-'+str(epoch)+'.ckpt'))
+                        'models', args.exp_name,'model-highest-'+str(epoch)+'.ckpt'))
                 except:
                     pass
             print('current_mAP = {:.2f}, highest_mAP = {:.2f}\n'.format(mAP_score, highest_mAP))
@@ -290,7 +306,15 @@ def train_multi_label_zsl(args, model, train_loader, val_loader, lr, train_wordv
             print('current_f1_k5 = {:.2f}, f1_k5_at_highest_mAP = {:.2f}\n'.format(f1_5, f1_5_at_highest_mAP))
             print('current_p_k5 = {:.2f}, p_k5_at_highest_mAP = {:.2f}\n'.format(p_5, p_5_at_highest_mAP))
             print('current_r_k5 = {:.2f}, r_k5_at_highest_mAP = {:.2f}\n'.format(r_5, r_5_at_highest_mAP))
-        
+            wandb.log({
+                "highest_mAP": highest_mAP,
+                "f1_3_at_highest_mAP": f1_3_at_highest_mAP,
+                "p_3_at_highest_mAP": p_3_at_highest_mAP,
+                "r_3_at_highest_mAP": r_3_at_highest_mAP,
+                "f1_5_at_highest_mAP": f1_5_at_highest_mAP,
+                "p_5_at_highest_mAP": p_5_at_highest_mAP,
+                "r_5_at_highest_mAP": r_5_at_highest_mAP
+            })
         elif args.best_metric == 'average':
             current_average = np.mean([mAP_score, f1_3, p_3, r_3, f1_5, p_5, r_5])
             if current_average > highest_average:
@@ -313,19 +337,6 @@ def train_multi_label_zsl(args, model, train_loader, val_loader, lr, train_wordv
             print('current_f1_k5 = {:.2f}, f1_k5_at_highest_average = {:.2f}\n'.format(f1_5, f1_5_at_highest_average))
             print('current_p_k5 = {:.2f}, p_k5_at_highest_average = {:.2f}\n'.format(p_5, p_5_at_highest_average))
             print('current_r_k5 = {:.2f}, r_k5_at_highest_average = {:.2f}\n'.format(r_5, r_5_at_highest_average))
-
-        if args.best_metric == 'mAP':
-            wandb.log({
-                "highest_mAP": highest_mAP,
-                "f1_3_at_highest_mAP": f1_3_at_highest_mAP,
-                "p_3_at_highest_mAP": p_3_at_highest_mAP,
-                "r_3_at_highest_mAP": r_3_at_highest_mAP,
-                "f1_5_at_highest_mAP": f1_5_at_highest_mAP,
-                "p_5_at_highest_mAP": p_5_at_highest_mAP,
-                "r_5_at_highest_mAP": r_5_at_highest_mAP,
-                "epoch": epoch
-            })
-        elif args.best_metric == 'average':
             wandb.log({
                 "highest_average": highest_average,
                 "f1_3_at_highest_average": f1_3_at_highest_average,
@@ -336,14 +347,14 @@ def train_multi_label_zsl(args, model, train_loader, val_loader, lr, train_wordv
                 "r_5_at_highest_average": r_5_at_highest_average,
                 "epoch": epoch
             })
-        if args.add_clip_loss:
-            logs = {"epoch": epoch}
-            logs["val_clip_loss"] = torch.mean(torch.Tensor(clip_losses))
-            wandb.log(logs)
+
         
         model.train()
         if args.validate_only:
             break
+
+
+
 
 def validate_multi(args, val_loader, model, ema_model, clip_model, clip_criterion):
     print("starting validation")
@@ -367,13 +378,13 @@ def validate_multi(args, val_loader, model, ema_model, clip_model, clip_criterio
             with autocast():
                 if args.add_clip_loss:
                     clip_tokens = data_dict['clip_tokens'].cuda()
-                output_regular, image_embeddings = model(input.cuda())
-                if args.add_clip_loss:
                     text_features = clip_model.encode_text(clip_tokens)
+                output_regular, image_embeddings = model(input.cuda(), text_features)
+                if args.add_clip_loss:
                     clip_loss, _, _ = clip_criterion(image_embeddings, text_features)
                     clip_losses.append(clip_loss.item())
                 output_regular = Sig(output_regular).cpu()
-                output_ema, _ = ema_model.module(input.cuda())
+                output_ema, _ = ema_model.module(input.cuda(), text_features)
                 output_ema = Sig(output_ema).cpu()
                 # output_ema = Sig(ema_model.module(input.cuda())).cpu()
 

@@ -112,7 +112,7 @@ def main():
     plt.axis('tight')
     # plt.rcParams["axes.titlesize"] = 10
     plt.title("detected classes: {}".format(detected_classes))
-    plt.savefig(os.path.join(os.path.dirname(args.pic_path), Path(args.pic_path).stem + '_inference.jpg'))
+    plt.savefig(os.path.join('/l/users/muhammad.ali/ML_Decoder/pics', Path(args.pic_path).stem + '_inference.jpg'))
     plt.show()
     print('done\n')
 
