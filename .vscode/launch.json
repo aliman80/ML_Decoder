@@ -8,7 +8,7 @@
             "name": "clip",
             "type": "python",
             "request": "launch",
-            "program": "encode_text_clip.py",
+            "program": "encode_text_clip-coco.py",
             "console": "integratedTerminal",
             "justMyCode": false
         },
@@ -17,6 +17,14 @@
             "type": "python",
             "request": "launch",
             "program": "${file}",
+            "console": "integratedTerminal",
+        },
+
+        {
+            "name": "preprocess",
+            "type": "python",
+            "request": "launch",
+            "program": "MSCOCO/preprocess.py",
             "console": "integratedTerminal",
         },
         {
@@ -57,28 +65,32 @@
                 //  "--resume_training", "1",
                 //  "--model-path", "models/model-highest.ckpt",
                 "--model-path","/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_m21k.pth",
-                "--text-embeddings", "wordvec",
-                "--clip-prompt", "a picture containing",
+                "--text-embeddings", "clip",
+                "--clip-prompt", "a picture of ",
                 "--gzsl", "0",
                 "--workers", "16", 
-                // "--freeze_clip", "1",
+                "--freeze-clip", "0",
                 // "--validate_only", "1",
-                "--exp_name", "train_textencodethr0.7",
+                "--exp_name", "coco",
                 "--thr", "0.7",
+                "--batch-size", "56",
                 
-                "--add-clip-loss", "0",
+                "--add-clip-loss", "1",
                 "--clip-loss-weight", ".1",
 
                 "--add-distil-loss", "0",
-                "--distil-loss-weight", ".1",
+                "--distil-loss-weight", "1",
 
                 "--classif-loss-weight", "1",
-                "--batch-size", "56",
                 "--best_metric", "average",
 
                 "--use_prompt_learner", "0",
                 "--prompt_learner_n_ctx", "1",
                 //"--replace-image-encoder-with-clip","1"
+
+
+                "--data", "/home/muhammad.ali/Projects/PLZSD/PL-ZSD_Release/Dataset",
+                "--image_size", "448"
             ]
         },
         {
@@ -91,9 +103,9 @@
                  "--model-name", "tresnet_m",
                  "--resume_training", "1",
                 "--model-path","/l/users/muhammad.ali/mld_updated/ML_Decoder/models/test/model-highest-7.ckpt",
-                "--pic-path", "/l/users/muhammad.ali/ML_Decoder/pics/0085_2343760208.jpg",
+                "--pic-path", "//home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/images/12542_2241615995_6bec315aec_m.jpg",
                 "--text_embeddings", "clip",
-                "--th", "0.6"
+                "--th", "0.7"
             ]
         }
     ]

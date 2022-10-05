@@ -6,6 +6,8 @@
 /models/
 /picture-clip/
 /clip-
+/MSCOCO
+
 
 classes.csv
 clip_array.pth
