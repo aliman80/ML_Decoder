@@ -101,17 +101,24 @@ def main():
     print(scores)
     idx_th = scores > args.th
     detected_classes = detected_classes[idx_th]
+    class_scores = scores[idx_th] 
+    print_dict = {}
+    for key, item in zip(detected_classes, class_scores):
+        print_dict[key] = item.round(2)
     print('done\n')
+
 
 
     # displaying image
     print('showing image on screen...')
     fig = plt.figure()
+    ax = plt.gca()
     plt.imshow(im)
     plt.axis('off')
     plt.axis('tight')
-    # plt.rcParams["axes.titlesize"] = 10
+    plt.rcParams["axes.titlesize"] = 10
     plt.title("detected classes: {}".format(detected_classes))
+    plt.title("detected classes: {}".format(print_dict), fontsize='x-small') # {size in points, 'x-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large'}
     plt.savefig(os.path.join('/l/users/muhammad.ali/ML_Decoder/pics', Path(args.pic_path).stem + '_inference.jpg'))
     plt.show()
     print('done\n')
