@@ -35,7 +35,7 @@ parser.add_argument('--data', type=str, default='/home/muhammad.ali/Desktop/Rese
 parser.add_argument('--lr', default=1e-4, type=float)
 parser.add_argument('--model-name', default='tresnet_m')
 parser.add_argument('--model-path', default='/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_m21k.pth', type=str)
-parser.add_argument('--num-classes', default=925)
+parser.add_argument('--num-classes', default=925, type=int)
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers')
 parser.add_argument('--image_size', default=224, type=int,
@@ -57,17 +57,15 @@ parser.add_argument('--replace-image-encoder-with-clip',default= 0,type=int, hel
 parser.add_argument('--text-embeddings', default='wordvec', type=str, help='the text embedings to load, options=["wordvec","clip"]')
 parser.add_argument('--clip-prompt', default='a photo of ', type=str, help='prompt to be used to generate clip image label embeddings and class embeddings (if text-embeddings == "clip")')
 parser.add_argument('--add-clip-loss', default=1, type=int)
+parser.add_argument('--clip-loss-weight', default=0.1, type=float)
 parser.add_argument('--freeze-clip', default=0, type=int)
 parser.add_argument('--clip-loss-temp', default=0.1, type=float) #change clip loss
-parser.add_argument('--clip-loss-weight', default=0.1, type=float)
+
 parser.add_argument('--add-distil-loss', default=1, type=int)
 parser.add_argument('--distil-loss-weight', default=1, type=float)
-parser.add_argument('--classif-loss-weight', default=1, type=float)
-parser.add_argument('--clip-loss-temp', default=0.1, type=float)
-parser.add_argument('--clip-loss-weight', default= 1, type=float)
-parser.add_argument('--classif-loss-weight', default=.1, type=float)
-parser.add_argument('--gzsl', default=0, type=int)
 
+parser.add_argument('--classif-loss-weight', default=1, type=float)
+parser.add_argument('--gzsl', default=0, type=int)
 parser.add_argument('--resume_training', default=0, type=int)
 parser.add_argument('--exp_name', default = 'test',type= str)
 parser.add_argument('--validate_only', default=0, type=int)
@@ -88,9 +86,7 @@ def main():
     # wandb.define_metric('mAP', summary='max')
     #NUS-WIDE defaults
     args.zsl = 1
-    args.num_of_groups = 925
     args.use_ml_decoder = 1
-    args.num_classes = 925
 
     # Setup model
     print('creating model {}...'.format(args.model_name))
@@ -108,11 +104,17 @@ def main():
     if args.add_clip_loss or args.add_distil_loss or args.text_embeddings == 'clip':
         device = "cuda" if torch.cuda.is_available() else "cpu"
         clip_model, _ = clip.load('RN50', device)
+        clip_criterion = CLIPLoss(args.clip_loss_temp, args.decoder_embedding, 1024, 512, device)
         if args.freeze_clip:
             # Freeze CLIP's weights
             for param in clip_model.parameters():
                 param.requires_grad = False
-
+        
+        if args.use_prompt_learner:
+            pl_clip = PLCLIP(args, classnames, clip_model, device)
+    
+    if args.add_distil_loss:
+        distil_criterion = DistillationLoss(args.num_classes, 1024, device)
 
     #NUS-WIDE Data loading
     #json_path = os.path.join(args.data, '/home/muhammad.ali/Desktop/Research/MLDECODER/benchmark_81_v0.json')
@@ -122,7 +124,7 @@ def main():
         wordvec_array = torch.load(os.path.join(args.data, args.text_embeddings+ '_array.pth'))
     elif args.text_embeddings == 'clip':
         # wordvec_array = torch.load(os.path.join(args.data, 'clip_embeddings', args.clip_prompt, args.text_embeddings + '_array.pth'))
-        wordvec_array = generate_clip_array(args, clip_model, device)
+        wordvec_array = generate_clip_array(args)
 
     train_transform = transforms.Compose([
                                       transforms.Resize((args.image_size, args.image_size)),
@@ -166,19 +168,7 @@ def main():
         val_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=False)
 
-    clip_model = None
-    clip_criterion = None
-    pl_clip = None
-    if args.add_clip_loss:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        clip_model, _ = clip.load('RN50', device)
-        clip_criterion = CLIPLoss(args.clip_loss_temp, args.decoder_embedding, 1024, 512, device)
-    
-        if args.use_prompt_learner:
-            pl_clip = PLCLIP(args, classnames, clip_model, device)
-    
-    if args.add_distil_loss:
-        distil_criterion = DistillationLoss(args.num_classes, 1024, device)
+
      
      
      
@@ -194,14 +184,15 @@ def train_multi_label_zsl(args, model, train_loader, val_loader, lr, train_wordv
 
     # set optimizer
     Epochs = 40
-    weight_decay = 1e-3 # 5e-3
+    weight_decay = 1e-2 # 5e-3
     criterion = AsymmetricLoss(gamma_neg=4, gamma_pos=0, clip=0.05, disable_torch_grad_focal_loss=True)
     parameters = add_weight_decay(model, weight_decay)
+    import pdb; pdb.set_trace
     optimizer = torch.optim.Adam(params=parameters, lr=lr, weight_decay=0)  # true wd, filter_bias_and_bn
-    if args.add_clip_loss or args.add_distil_loss or args.text_embeddings == 'clip':
+    if args.add_clip_loss or args.add_distil_loss:
         optimizer.add_param_group({'params': list(clip_model.parameters())})
     if args.add_clip_loss:
-                    optimizer.add_param_group({'params': list(clip_criterion.parameters())})
+        optimizer.add_param_group({'params': list(clip_criterion.parameters())})
        # clip_optimizer = torch.optim.Adam(params=list(clip_model.parameters()) + list(clip_criterion.parameters()), lr=lr, weight_decay=0)
     if args.add_distil_loss:
         optimizer.add_param_group({'params': list(distil_criterion.parameters())})
@@ -229,7 +220,7 @@ def train_multi_label_zsl(args, model, train_loader, val_loader, lr, train_wordv
                         else:
                             clip_tokens = input['clip_tokens'].cuda()
                             text_features = clip_model.encode_text(clip_tokens)
-                    output, image_embeddings = model(inputData, text_features) # sigmoid will be done in loss !
+                    output, image_embeddings = model(inputData) # sigmoid will be done in loss !
                     output = output.float()  
                     if args.add_clip_loss:
                         clip_loss, _, _ = clip_criterion(image_embeddings, text_features)
@@ -252,7 +243,7 @@ def train_multi_label_zsl(args, model, train_loader, val_loader, lr, train_wordv
 
                 scaler.step(optimizer)
                 scaler.update()
-                # optimizer.step()
+                optimizer.step()
 
                 scheduler.step()
 
@@ -379,12 +370,12 @@ def validate_multi(args, val_loader, model, ema_model, clip_model, clip_criterio
                 if args.add_clip_loss:
                     clip_tokens = data_dict['clip_tokens'].cuda()
                     text_features = clip_model.encode_text(clip_tokens)
-                output_regular, image_embeddings = model(input.cuda(), text_features)
+                output_regular, image_embeddings = model(input.cuda())
                 if args.add_clip_loss:
                     clip_loss, _, _ = clip_criterion(image_embeddings, text_features)
                     clip_losses.append(clip_loss.item())
                 output_regular = Sig(output_regular).cpu()
-                output_ema, _ = ema_model.module(input.cuda(), text_features)
+                output_ema, _ = ema_model.module(input.cuda())
                 output_ema = Sig(output_ema).cpu()
                 # output_ema = Sig(ema_model.module(input.cuda())).cpu()
 

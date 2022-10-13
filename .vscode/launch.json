@@ -66,16 +66,15 @@
                 //  "--model-path", "models/model-highest.ckpt",
                 "--model-path","/home/muhammad.ali/Desktop/Research/MLDECODER/tresnet_m21k.pth",
                 "--text-embeddings", "clip",
-                "--clip-prompt", "a picture of ",
+                "--clip-prompt", "a photo of ",
                 "--gzsl", "0",
                 "--workers", "16", 
                 "--freeze-clip", "0",
                 // "--validate_only", "1",
-                "--exp_name", "coco",
                 "--thr", "0.7",
                 "--batch-size", "56",
                 
-                "--add-clip-loss", "1",
+                "--add-clip-loss", "0",
                 "--clip-loss-weight", ".1",
 
                 "--add-distil-loss", "0",
@@ -89,8 +88,16 @@
                 //"--replace-image-encoder-with-clip","1"
 
 
-                "--data", "/home/muhammad.ali/Projects/PLZSD/PL-ZSD_Release/Dataset",
-                "--image_size", "448"
+                // "--exp_name", "coco",
+                // // "--data", "/home/muhammad.ali/Projects/PLZSD/PL-ZSD_Release/Dataset",
+                // "--image_size", "448",
+                // "--num-of-groups", "65",
+                // "--num-classes", "65"
+                "--exp_name", "nus_wide",
+                "--data", "/home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/",
+                "--image_size", "224",
+                "--num-of-groups", "925",
+                "--num-classes", "925",
             ]
         },
         {
@@ -103,10 +110,11 @@
                  "--model-name", "tresnet_m",
                  "--resume_training", "1",
                 "--model-path","/l/users/muhammad.ali/mld_updated/ML_Decoder/models/test/model-highest-7.ckpt",
-                "--pic-path", "//home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/images/12542_2241615995_6bec315aec_m.jpg",
+                "--pic-path", "/home/muhammad.ali/Desktop/Research/MLDECODER/ML_Decoder/images/117718_2128662770_8c1a867733_m.jpg",
+                //"--pic-path", "/l/users/muhammad.ali/ML_Decoder/pics/pic1.jpg",
                 "--text_embeddings", "clip",
-                "--th", "0.7"
+                "--th", "0.60"
             ]
-        }
+        }    
     ]
 }
