@@ -1,4 +1,4 @@
-# ML-Decoder: Scalable and Versatile Classification Head
+# CLIP-Decoder:Multilabel Classification in ZSL settings
 
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/ml-decoder-scalable-and-versatile/multi-label-classification-on-ms-coco)](https://paperswithcode.com/sota/multi-label-classification-on-ms-coco?p=ml-decoder-scalable-and-versatile)<br>
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/ml-decoder-scalable-and-versatile/multi-label-zero-shot-learning-on-nus-wide)](https://paperswithcode.com/sota/multi-label-zero-shot-learning-on-nus-wide?p=ml-decoder-scalable-and-versatile)<br>
